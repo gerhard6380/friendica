@@ -2736,7 +2736,7 @@ $called_api = null;
 					} catch( BadRequestException $e ) {
 						// user not found. should be found?
 						/// @todo check if the user should be always found
-						$retweeted_status["user"] = array();
+						$retweeted_status["user"] = null;
 					}
 
 					$rt_converted = api_convert_item($retweeted_item);
