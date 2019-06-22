@@ -6,25 +6,26 @@
 	<div id="profile-edit-links">
 		<ul class="nav nav-pills preferences">
 			<li class="dropdown pull-right">
-				<button type="button" class="btn btn-link btn-sm dropdown-toggle" id="profile-edit-links-dropdown" data-toggle="dropdown" aria-expanded="true">
+				<button type="button" class="btn btn-link btn-sm dropdown-toggle" id="profile-edit-links-dropdown" data-toggle="dropdown" aria-expanded="false">
 					<i class="fa fa-angle-down"  aria-hidden="true"></i>&nbsp;{{$profile_action}}
 				</button>
 				<ul class="dropdown-menu pull-right" role="menu" aria-labelledby="profile-edit-links-dropdown">
-					<li role="menuitem"><a href="profile_photo" id="profile-photo_upload-link" title="{{$profpic|escape:'html'}}"><i class="fa fa-user"  aria-hidden="true"></i>&nbsp;{{$profpic}}</a></li>
-					<li role="menuitem"><button type="button" class="btn-link" id="profile-photo_upload-link" title="{{$profpic|escape:'html'}}" onclick="openClose('profile-photo-upload-section');"><i class="fa fa-user" aria-hidden="true"></i>&nbsp;{{$profpic}}</button></li>
+					<li role="presentation"><a role="menuitem" href="{{$profpiclink}}" id="profile-photo_upload-link" title="{{$profpic}}"><i class="fa fa-user" aria-hidden="true"></i>&nbsp;{{$profpic}}</a></li>
+					<li role="presentation"><button role="menuitem" type="button" class="btn-link" id="profile-photo_upload-link-new" title="{{$lbl_profile_photo}}" onclick="openClose('profile-photo-upload-section');"><i class="fa fa-user" aria-hidden="true"></i>&nbsp;{{$lbl_profile_photo}}</button></li>
 					{{if ! $is_default}}
-					<li class="nav-item"><a href="profperm/{{$profile_id}}" id="profile-edit-visibility-link" title="{{$editvis}}"><i class="fa fa-pencil"  aria-hidden="true"></i>&nbsp;{{$editvis}}</a>
+					<li role="presentation" class="nav-item"><a role="menuitem" href="profperm/{{$profile_id}}" id="profile-edit-visibility-link" title="{{$editvis}}"><i class="fa fa-pencil" aria-hidden="true"></i>&nbsp;{{$editvis}}</a>
 					</li>
 					{{/if}}
-					<li role="separator" class="divider"></li>
-					<li role="menuitem"><a href="profile/{{$profile_id}}/view?tab=profile" id="profile-edit-view-link" title="{{$viewprof|escape:'html'}}">{{$viewprof}}</a></li>
+					<li role="presentation" class="divider"></li>
+					<li role="presentation"><a role="menuitem" href="profile/{{$profile_id}}/view?tab=profile" id="profile-edit-view-link" title="{{$viewprof}}">{{$viewprof}}</a></li>
+					<li role="presentation"><a role="menuitem" href="profiles" id="profile-edit-view-link" title="{{$viewallprof}}">{{$viewallprof}}</a></li>
 					{{if $profile_clone_link}}
-					<li role="separator"class="divider"></li>
-					<li role="menuitem"><a href="{{$profile_clone_link}}" id="profile-edit-clone-link" title="{{$cr_prof|escape:'html'}}">{{$cl_prof}}</a></li>
+					<li role="presentation" class="divider"></li>
+					<li role="presentation"><a role="menuitem" href="{{$profile_clone_link}}" id="profile-edit-clone-link" title="{{$cr_prof}}">{{$cl_prof}}</a></li>
 					{{/if}}
 					{{if !$is_default}}
-					<li role="separator" class="divider"></li>
-					<li role="menuitem"><a href="{{$profile_drop_link}}" id="profile-edit-drop-link" title="{{$del_prof|escape:'html'}}"><i class="fa fa-trash" aria-hidden="true"></i>&nbsp;{{$del_prof}}</a></li>
+					<li role="presentation" class="divider"></li>
+					<li role="presentation"><a role="menuitem" href="{{$profile_drop_link}}" id="profile-edit-drop-link" title="{{$del_prof}}"><i class="fa fa-trash" aria-hidden="true"></i>&nbsp;{{$del_prof}}</a></li>
 					{{/if}}
 				</ul>
 			</li>
@@ -64,7 +65,7 @@
 
 		{{* Some hints to characteristics of the current profile (if available) *}}
 		{{if $is_default}}
-		<div class="section-content-info-wrapper">{{$default}}</div>
+		<div class="section-content-info-wrapper">{{$default nofilter}}</div>
 		{{/if}}
 
 		{{* friendica differs in $detailled_profile (all fields available and a short Version if this is variable false *}}
@@ -90,16 +91,15 @@
 
 						{{include file="field_input.tpl" field=$pdesc}}
 
-
 						<div id="profile-edit-gender-wrapper" class="form-group field select">
 							<label id="profile-edit-gender-label" for="gender-select" >{{$lbl_gender}} </label>
-							{{$gender}}
+							{{$gender nofilter}}
 						</div>
 						<div class="clear"></div>
 
-						{{$dob}}
+						{{$dob nofilter}}
 
-						{{$hide_friends}}
+						{{$hide_friends nofilter}}
 
 						<div class="form-group pull-right" >
 							<button type="submit" name="submit" class="btn btn-primary" value="{{$submit}}">{{$submit}}</button>
@@ -113,7 +113,7 @@
 			<div class="panel">
 				<div class="section-subtitle-wrapper" role="tab" id="location">
 					<h4>
-						<a class="accordion-toggle collapsed" data-toggle="collapse" data-parent="#profile-edit-wrapper" href="#location-collapse" aria-expanded="true" aria-controls="location-collapse">
+						<a class="accordion-toggle collapsed" data-toggle="collapse" data-parent="#profile-edit-wrapper" href="#location-collapse" aria-expanded="false" aria-controls="location-collapse">
 							{{$lbl_location_section}}
 						</a>
 					</h4>
@@ -159,7 +159,7 @@
 			<div class="panel">
 				<div class="section-subtitle-wrapper" role="tab" id="relation">
 					<h4>
-						<a class="accordion-toggle collapsed" data-toggle="collapse" data-parent="#profile-edit-wrapper" href="#relation-collapse" aria-expanded="true" aria-controls="relation-collapse">
+						<a class="accordion-toggle collapsed" data-toggle="collapse" data-parent="#profile-edit-wrapper" href="#relation-collapse" aria-expanded="false" aria-controls="relation-collapse">
 							{{$lbl_relation_section}}
 						</a>
 					</h4>
@@ -167,8 +167,8 @@
 				<div id="relation-collapse" class="panel-collapse collapse" role="tabpanel" aria-labelledby="relation">
 					<div class="section-content-tools-wrapper">
 						<div id="profile-edit-marital-wrapper" class="form-group field select" >
-								<label id="profile-edit-marital-label" for="profile-edit-marital" >{{$lbl_marital}}</label>
-								{{$marital}}
+								<label id="profile-edit-marital-label" for="profile-edit-marital" >{{$lbl_marital nofilter}}</label>
+								{{$marital.selector nofilter}}
 						</div>
 						<div class="clear"></div>
 
@@ -178,7 +178,7 @@
 
 						<div id="profile-edit-sexual-wrapper" class="form-group field select" >
 							<label id="profile-edit-sexual-label" for="sexual-select" >{{$lbl_sexual}}</label>
-							{{$sexual}}
+							{{$sexual.selector nofilter}}
 						</div>
 						<div class="clear"></div>
 
@@ -194,7 +194,7 @@
 			<div class="panel">
 				<div class="section-subtitle-wrapper" role="tab" id="miscellaneous">
 					<h4>
-						<a class="accordion-toggle collapsed" data-toggle="collapse" data-parent="#profile-edit-wrapper" href="#miscellaneous-collapse" aria-expanded="true" aria-controls="miscellaneous-collapse">
+						<a class="accordion-toggle collapsed" data-toggle="collapse" data-parent="#profile-edit-wrapper" href="#miscellaneous-collapse" aria-expanded="false" aria-controls="miscellaneous-collapse">
 							{{$lbl_miscellaneous_section}}
 						</a>
 					</h4>
@@ -260,11 +260,11 @@
 		{{if $personal_account}}
 		<div id="profile-edit-gender-wrapper" class="form-group field select">
 			<label id="profile-edit-gender-label" for="gender-select" >{{$lbl_gender}} </label>
-			{{$gender}}
+			{{$gender nofilter}}
 		</div>
 		<div class="clear"></div>
 
-		{{$dob}}
+		{{$dob nofilter}}
 
 		{{/if}}
 
@@ -272,7 +272,7 @@
 
 		{{include file="field_input.tpl" field=$xmpp}}
 
-		{{$hide_friends}}
+		{{$hide_friends nofilter}}
 
 		{{include file="field_input.tpl" field=$address}}
 
@@ -317,8 +317,10 @@
 		<input type="hidden" name="religion" id="profile-edit-religion" value="{{$religion.2}}" />
 		<input type="hidden" id="likes-jot-text" name="likes" value="{{$likes.2}}" />
 		<input type="hidden" id="dislikes-jot-text" name="dislikes" value="{{$dislikes.2}}" />
+		<input type="hidden" name="marital" id="profile-edit-marital" value="{{$marital.value}}" />
 		<input type="hidden" name="with" id="profile-edit-with" value="{{$with.2}}" />
 		<input type="hidden" name="howlong" id="profile-edit-howlong" value="{{$howlong.2}}" />
+		<input type="hidden" name="sexual" id="profile-edit-sexual" value="{{$sexual.value}}" />
 		<input type="hidden" id="romance-jot-text" name="romance" value="{{$romance.2}}" />
 		<input type="hidden" id="work-jot-text" name="work" value="{{$work.2}}" />
 		<input type="hidden" id="education-jot-text" name="education" value="{{$education.2}}" />
@@ -332,7 +334,7 @@
 	</form>
 </div>
 
-<script language="javascript" type="text/javascript">
+<script type="text/javascript">
 	Fill_Country('{{$country_name.2}}');
 	Fill_States('{{$region.2}}');
 

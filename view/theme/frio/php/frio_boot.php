@@ -3,33 +3,33 @@
 /**
  * @file view/theme/frio/php/frio_boot.php
  *
- * @brief This file contains functions for page contstruction
+ * @brief This file contains functions for page construction
  *
  */
 
+use Friendica\App;
 
 /**
  * @brief Load page template in dependence of the template mode
  *
  * @todo Check if this is really needed.
  */
-function load_page(App $a) {
-	if(isset($_GET["mode"]) AND ($_GET["mode"] == "minimal")) {
-		require "view/theme/frio/minimal.php";
-	} elseif((isset($_GET["mode"]) AND ($_GET["mode"] == "none"))) {
-		require "view/theme/frio/none.php";
+function load_page(App $a)
+{
+	if (isset($_GET['mode']) && ($_GET['mode'] == 'minimal')) {
+		require 'view/theme/frio/minimal.php';
+	} elseif ((isset($_GET['mode']) && ($_GET['mode'] == 'none'))) {
+		require 'view/theme/frio/none.php';
 	} else {
-		$template = 'view/theme/' . current_theme() . '/'
-			. ((x($a->page,'template')) ? $a->page['template'] : 'default' ) . '.php';
-		if(file_exists($template))
-			require_once($template);
-		else
-			require_once(str_replace('theme/' . current_theme() . '/', '', $template));
+		$template = 'view/theme/' . $a->getCurrentTheme() . '/'
+			. defaults($a->page, 'template', 'default' ) . '.php';
+		if (file_exists($template)) {
+			require_once $template;
+		} else {
+			require_once str_replace('theme/' . $a->getCurrentTheme() . '/', '', $template);
+		}
 	}
-
-
 }
-
 
 /**
  * @brief Check if page is a modal page
@@ -62,12 +62,12 @@ function is_modal() {
  */
 function get_modalpage_list() {
 	//Arry of pages wich getting bootstrap modal dialogs
-	$modalpages = array('poke/',
+	$modalpages = ['poke/',
 			'message/new',
 			'settings/oauth/add',
 			'events/new',
 //			'fbrowser/image/'
-	);
+	];
 
 	return $modalpages;
 }
@@ -82,9 +82,9 @@ function get_modalpage_list() {
  */
 function get_standard_page_list() {
 	//Arry of pages wich getting the standard page template
-	$standardpages = array(//'profile',
+	$standardpages = [//'profile',
 //			'fbrowser/image/'
-	);
+	];
 
 	return $standardpages;
 }

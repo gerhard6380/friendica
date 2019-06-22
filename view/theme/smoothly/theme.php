@@ -10,13 +10,17 @@
  * Screenshot: <a href="screenshot.png">Screenshot</a>
  */
 
+use Friendica\App;
+use Friendica\Core\Renderer;
+use Friendica\Core\System;
+
 function smoothly_init(App $a) {
-	set_template_engine($a, 'smarty3');
+	Renderer::setActiveTemplateEngine('smarty3');
 
 	$cssFile = null;
 	$ssl_state = null;
-	$baseurl = App::get_baseurl($ssl_state);
-$a->page['htmlhead'] .= <<< EOT
+	$baseurl = System::baseUrl($ssl_state);
+	$a->page['htmlhead'] .= <<< EOT
 
 <script>
 function insertFormatting(BBcode, id) {
@@ -31,19 +35,11 @@ function insertFormatting(BBcode, id) {
 	if (document.selection) {
 		textarea.focus();
 		selected = document.selection.createRange();
-		if (BBcode == "url") {
-			selected.text = "["+BBcode+"]" + "http://" +  selected.text + "[/"+BBcode+"]";
-		} else {
-			selected.text = "["+BBcode+"]" + selected.text + "[/"+BBcode+"]";
-		}
+		selected.text = "["+BBcode+"]" + selected.text + "[/"+BBcode+"]";
 	} else if (textarea.selectionStart || textarea.selectionStart == "0") {
 		var start = textarea.selectionStart;
 		var end = textarea.selectionEnd;
-		if (BBcode == "url") {
-			textarea.value = textarea.value.substring(0, start) + "["+BBcode+"]" + "http://" + textarea.value.substring(start, end) + "[/"+BBcode+"]" + textarea.value.substring(end, textarea.value.length);
-		} else {
-			textarea.value = textarea.value.substring(0, start) + "["+BBcode+"]" + textarea.value.substring(start, end) + "[/"+BBcode+"]" + textarea.value.substring(end, textarea.value.length);
-		}
+		textarea.value = textarea.value.substring(0, start) + "["+BBcode+"]" + textarea.value.substring(start, end) + "[/"+BBcode+"]" + textarea.value.substring(end, textarea.value.length);
 	}
 
 	return true;
@@ -99,25 +95,24 @@ $(document).ready(function() {
 </script>
 EOT;
 
-    	/** custom css **/
+	/** custom css **/
 	if (!is_null($cssFile)) {
         $a->page['htmlhead'] .= sprintf('<link rel="stylesheet" type="text/css" href="%s" />', $cssFile);
 	}
 
-_js_in_foot();
-
+	_js_in_foot();
 }
 
 if (! function_exists('_js_in_foot')) {
 	function _js_in_foot() {
 		/** @purpose insert stuff in bottom of page
 		*/
-		$a = get_app();
+		$a = \get_app();
 		$ssl_state = null;
-		$baseurl = App::get_baseurl($ssl_state);
+		$baseurl = System::baseUrl($ssl_state);
 		$bottom['$baseurl'] = $baseurl;
-		$tpl = get_markup_template('bottom.tpl');
+		$tpl = Renderer::getMarkupTemplate('bottom.tpl');
 
-		return $a->page['bottom'] = replace_macros($tpl, $bottom);
+		return $a->page['bottom'] = Renderer::replaceMacros($tpl, $bottom);
 	}
 }

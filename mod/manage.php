@@ -1,7 +1,14 @@
 <?php
+/**
+ * @file mod/manage.php
+ */
 
-require_once("include/text.php");
-
+use Friendica\App;
+use Friendica\Core\Hook;
+use Friendica\Core\L10n;
+use Friendica\Core\Renderer;
+use Friendica\Core\Session;
+use Friendica\Database\DBA;
 
 function manage_post(App $a) {
 
@@ -12,11 +19,11 @@ function manage_post(App $a) {
 	$uid = local_user();
 	$orig_record = $a->user;
 
-	if((x($_SESSION,'submanage')) && intval($_SESSION['submanage'])) {
+	if(!empty($_SESSION['submanage'])) {
 		$r = q("select * from user where uid = %d limit 1",
 			intval($_SESSION['submanage'])
 		);
-		if (dbm::is_result($r)) {
+		if (DBA::isResult($r)) {
 			$uid = intval($r[0]['uid']);
 			$orig_record = $r[0];
 		}
@@ -28,15 +35,15 @@ function manage_post(App $a) {
 
 	$submanage = $r;
 
-	$identity = ((x($_POST['identity'])) ? intval($_POST['identity']) : 0);
-	if (! $identity) {
+	$identity = (!empty($_POST['identity']) ? intval($_POST['identity']) : 0);
+	if (!$identity) {
 		return;
 	}
 
 	$limited_id = 0;
 	$original_id = $uid;
 
-	if (dbm::is_result($submanage)) {
+	if (DBA::isResult($submanage)) {
 		foreach ($submanage as $m) {
 			if ($identity == $m['mid']) {
 				$limited_id = $m['mid'];
@@ -50,14 +57,36 @@ function manage_post(App $a) {
 			intval($limited_id)
 		);
 	} else {
-		$r = q("SELECT * FROM `user` WHERE `uid` = %d AND `email` = '%s' AND `password` = '%s' LIMIT 1",
+		// Check if the target user is one of our children
+		$r = q("SELECT * FROM `user` WHERE `uid` = %d AND `parent-uid` = %d LIMIT 1",
 			intval($identity),
-			dbesc($orig_record['email']),
-			dbesc($orig_record['password'])
+			DBA::escape($orig_record['uid'])
 		);
+
+		// Check if the target user is one of our siblings
+		if (!DBA::isResult($r) && ($orig_record['parent-uid'] != 0)) {
+			$r = q("SELECT * FROM `user` WHERE `uid` = %d AND `parent-uid` = %d LIMIT 1",
+				intval($identity),
+				DBA::escape($orig_record['parent-uid'])
+			);
+		}
+
+		// Check if it's our parent
+		if (!DBA::isResult($r) && ($orig_record['parent-uid'] != 0) && ($orig_record['parent-uid'] == $identity)) {
+			$r = q("SELECT * FROM `user` WHERE `uid` = %d LIMIT 1",
+				intval($identity)
+			);
+		}
+
+		// Finally check if it's out own user
+		if (!DBA::isResult($r) && ($orig_record['uid'] != 0) && ($orig_record['uid'] == $identity)) {
+			$r = q("SELECT * FROM `user` WHERE `uid` = %d LIMIT 1",
+				intval($identity)
+			);
+		}
 	}
 
-	if (! dbm::is_result($r)) {
+	if (!DBA::isResult($r)) {
 		return;
 	}
 
@@ -69,28 +98,27 @@ function manage_post(App $a) {
 	unset($_SESSION['theme']);
 	unset($_SESSION['mobile-theme']);
 	unset($_SESSION['page_flags']);
-	unset($_SESSION['return_url']);
-	if (x($_SESSION, 'submanage')) {
+	unset($_SESSION['return_path']);
+	if (!empty($_SESSION['submanage'])) {
 		unset($_SESSION['submanage']);
 	}
-	if (x($_SESSION, 'sysmsg')) {
+	if (!empty($_SESSION['sysmsg'])) {
 		unset($_SESSION['sysmsg']);
 	}
-	if (x($_SESSION, 'sysmsg_info')) {
+	if (!empty($_SESSION['sysmsg_info'])) {
 		unset($_SESSION['sysmsg_info']);
 	}
 
-	require_once('include/security.php');
-	authenticate_success($r[0], true, true);
+	Session::setAuthenticatedForUser($a, $r[0], true, true);
 
 	if ($limited_id) {
 		$_SESSION['submanage'] = $original_id;
 	}
 
-	$ret = array();
-	call_hooks('home_init',$ret);
+	$ret = [];
+	Hook::callAll('home_init',$ret);
 
-	goaway( App::get_baseurl() . "/profile/" . $a->user['nickname'] );
+	$a->internalRedirect('profile/' . $a->user['nickname'] );
 	// NOTREACHED
 }
 
@@ -99,11 +127,11 @@ function manage_post(App $a) {
 function manage_content(App $a) {
 
 	if (! local_user()) {
-		notice( t('Permission denied.') . EOL);
+		notice(L10n::t('Permission denied.') . EOL);
 		return;
 	}
 
-	if ($_GET['identity']) {
+	if (!empty($_GET['identity'])) {
 		$_POST['identity'] = $_GET['identity'];
 		manage_post($a);
 		return;
@@ -114,7 +142,7 @@ function manage_content(App $a) {
 	//getting additinal information for each identity
 	foreach ($identities as $key=>$id) {
 		$thumb = q("SELECT `thumb` FROM `contact` WHERE `uid` = '%s' AND `self` = 1",
-			dbesc($id['uid'])
+			DBA::escape($id['uid'])
 		);
 
 		$identities[$key]['thumb'] = $thumb[0]['thumb'];
@@ -126,34 +154,34 @@ function manage_content(App $a) {
 		$r = q("SELECT DISTINCT(`parent`) FROM `notify` WHERE `uid` = %d AND NOT `seen` AND NOT (`type` IN (%d, %d))",
 			intval($id['uid']), intval(NOTIFY_INTRO), intval(NOTIFY_MAIL));
 
-		if (dbm::is_result($r)) {
+		if (DBA::isResult($r)) {
 			$notifications = sizeof($r);
 		}
 
 		$r = q("SELECT DISTINCT(`convid`) FROM `mail` WHERE `uid` = %d AND NOT `seen`",
 			intval($id['uid']));
 
-		if (dbm::is_result($r)) {
+		if (DBA::isResult($r)) {
 			$notifications = $notifications + sizeof($r);
 		}
 
 		$r = q("SELECT COUNT(*) AS `introductions` FROM `intro` WHERE NOT `blocked` AND NOT `ignore` AND `uid` = %d",
 			intval($id['uid']));
 
-		if (dbm::is_result($r)) {
+		if (DBA::isResult($r)) {
 			$notifications = $notifications + $r[0]["introductions"];
 		}
 
 		$identities[$key]['notifications'] = $notifications;
 	}
 
-	$o = replace_macros(get_markup_template('manage.tpl'), array(
-		'$title' => t('Manage Identities and/or Pages'),
-		'$desc' => t('Toggle between different identities or community/group pages which share your account details or which you have been granted "manage" permissions'),
-		'$choose' => t('Select an identity to manage: '),
+	$o = Renderer::replaceMacros(Renderer::getMarkupTemplate('manage.tpl'), [
+		'$title' => L10n::t('Manage Identities and/or Pages'),
+		'$desc' => L10n::t('Toggle between different identities or community/group pages which share your account details or which you have been granted "manage" permissions'),
+		'$choose' => L10n::t('Select an identity to manage: '),
 		'$identities' => $identities,
-		'$submit' => t('Submit'),
-	));
+		'$submit' => L10n::t('Submit'),
+	]);
 
 	return $o;
 

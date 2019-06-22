@@ -1,3 +1,4 @@
+/* THIS FILE IS GENERATED FROM THE less SOURCE DO NOT EDIT MANUALLY */
 /**
  * Fabio Comuni <http://kirgroup.com/profile/fabrixxm>
  **/
@@ -468,7 +469,7 @@ blockquote {
   margin-left: 1em;
   border-left: 1em solid #e6e6e6;
 }
-code {
+pre code {
   font-family: Courier, monospace;
   white-space: pre;
   display: block;
@@ -2154,10 +2155,6 @@ ul.tabs li .active {
   margin: 0 10px 10px 0;
   position: relative;
 }
-.videos .video-top-wrapper .video-js {
-  width: 200px!important;
-  height: 132px!important;
-}
 .videos .video-top-wrapper .video-delete {
   position: absolute;
   opacity: 0;
@@ -2481,6 +2478,9 @@ footer {
   margin-top: 25px;
   clear: both;
 }
+.pager .disabled {
+  display: none;
+}
 /**
  * ADMIN
  */
@@ -2515,11 +2515,11 @@ footer {
   clear: left;
   text-align: right;
 }
-#adminpage #pluginslist {
+#adminpage #addonslist {
   margin: 0;
   padding: 0;
 }
-#adminpage .plugin {
+#adminpage .addon {
   list-style: none;
   display: block;
   border: 1px solid #888888;
@@ -2527,10 +2527,10 @@ footer {
   margin-bottom: 5px;
   clear: left;
 }
-#adminpage .plugin desc {
+#adminpage .addon desc {
   margin-left: 2.5em;
 }
-#adminpage .toggleplugin {
+#adminpage .toggleaddon {
   float: left;
   margin-right: 1em;
 }
@@ -2554,6 +2554,9 @@ footer {
 }
 #adminpage .selectall {
   text-align: right;
+}
+#adminpage .settings-block {
+  border-bottom: 1px solid #cccccc;
 }
 /* edit buttons for comments */
 .icon.dim {

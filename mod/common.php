@@ -1,12 +1,21 @@
 <?php
+/**
+ * @file include/common.php
+ */
 
-require_once('include/socgraph.php');
-require_once('include/Contact.php');
-require_once('include/contact_selectors.php');
-require_once('mod/contacts.php');
+use Friendica\App;
+use Friendica\Content\ContactSelector;
+use Friendica\Content\Pager;
+use Friendica\Core\L10n;
+use Friendica\Core\Renderer;
+use Friendica\Database\DBA;
+use Friendica\Model;
+use Friendica\Module;
+use Friendica\Util\Proxy as ProxyUtils;
+use Friendica\Util\Strings;
 
-function common_content(App $a) {
-
+function common_content(App $a)
+{
 	$o = '';
 
 	$cmd = $a->argv[1];
@@ -14,8 +23,8 @@ function common_content(App $a) {
 	$cid = intval($a->argv[3]);
 	$zcid = 0;
 
-	if (! local_user()) {
-		notice( t('Permission denied.') . EOL);
+	if (!local_user()) {
+		notice(L10n::t('Permission denied.') . EOL);
 		return;
 	}
 
@@ -23,54 +32,46 @@ function common_content(App $a) {
 		return;
 	}
 
-	if (! $uid) {
+	if (!$uid) {
 		return;
 	}
 
 	if ($cmd === 'loc' && $cid) {
-		$c = q("SELECT `name`, `url`, `photo` FROM `contact` WHERE `id` = %d AND `uid` = %d LIMIT 1",
-			intval($cid),
-			intval($uid)
-		);
-		/// @TODO Handle $c with dbm::is_result()
-		$a->page['aside'] = "";
-		profile_load($a, "", 0, get_contact_details_by_url($c[0]["url"]));
-	} else {
-		$c = q("SELECT `name`, `url`, `photo` FROM `contact` WHERE `self` = 1 AND `uid` = %d LIMIT 1",
-			intval($uid)
-		);
-		/// @TODO Handle $c with dbm::is_result()
+		$contact = DBA::selectFirst('contact', ['name', 'url', 'photo', 'uid', 'id'], ['id' => $cid, 'uid' => $uid]);
 
-		$vcard_widget .= replace_macros(get_markup_template("vcard-widget.tpl"),array(
-			'$name' => htmlentities($c[0]['name']),
-			'$photo' => $c[0]['photo'],
-			'url' => 'contacts/' . $cid
-		));
-
-		if (! x($a->page,'aside')) {
-			$a->page['aside'] = '';
+		if (DBA::isResult($contact)) {
+			$a->page['aside'] = "";
+			Model\Profile::load($a, "", 0, Model\Contact::getDetailsByURL($contact["url"]));
 		}
-		$a->page['aside'] .= $vcard_widget;
+	} else {
+		$contact = DBA::selectFirst('contact', ['name', 'url', 'photo', 'uid', 'id'], ['self' => true, 'uid' => $uid]);
+
+		if (DBA::isResult($contact)) {
+			$vcard_widget = Renderer::replaceMacros(Renderer::getMarkupTemplate("widget/vcard.tpl"), [
+				'$name'  => $contact['name'],
+				'$photo' => $contact['photo'],
+				'url'    => 'contact/' . $cid
+			]);
+
+			if (empty($a->page['aside'])) {
+				$a->page['aside'] = '';
+			}
+			$a->page['aside'] .= $vcard_widget;
+		}
 	}
 
-	if (! dbm::is_result($c)) {
+	if (!DBA::isResult($contact)) {
 		return;
 	}
 
-	if(! $cid) {
-		if(get_my_url()) {
-			$r = q("SELECT `id` FROM `contact` WHERE `nurl` = '%s' AND `uid` = %d LIMIT 1",
-				dbesc(normalise_link(get_my_url())),
-				intval($profile_uid)
-			);
-			if (dbm::is_result($r))
-				$cid = $r[0]['id'];
-			else {
-				$r = q("SELECT `id` FROM `gcontact` WHERE `nurl` = '%s' LIMIT 1",
-					dbesc(normalise_link(get_my_url()))
-				);
-				if (dbm::is_result($r))
-					$zcid = $r[0]['id'];
+	if (!$cid && Model\Profile::getMyURL()) {
+		$contact = DBA::selectFirst('contact', ['id'], ['nurl' => Strings::normaliseLink(Model\Profile::getMyURL()), 'uid' => $uid]);
+		if (DBA::isResult($contact)) {
+			$cid = $contact['id'];
+		} else {
+			$gcontact = DBA::selectFirst('gcontact', ['id'], ['nurl' => Strings::normaliseLink(Model\Profile::getMyURL())]);
+			if (DBA::isResult($gcontact)) {
+				$zcid = $gcontact['id'];
 			}
 		}
 	}
@@ -80,75 +81,74 @@ function common_content(App $a) {
 	}
 
 	if ($cid) {
-		$t = count_common_friends($uid, $cid);
+		$total = Model\GContact::countCommonFriends($uid, $cid);
 	} else {
-		$t = count_common_friends_zcid($uid, $zcid);
+		$total = Model\GContact::countCommonFriendsZcid($uid, $zcid);
 	}
 
-	if (count($t)) {
-		$a->set_pager_total($t);
-	} else {
-		notice( t('No contacts in common.') . EOL);
+	if ($total < 1) {
+		notice(L10n::t('No contacts in common.') . EOL);
 		return $o;
 	}
 
+	$pager = new Pager($a->query_string);
 
 	if ($cid) {
-		$r = common_friends($uid, $cid, $a->pager['start'], $a->pager['itemspage']);
+		$common_friends = Model\GContact::commonFriends($uid, $cid, $pager->getStart(), $pager->getItemsPerPage());
 	} else {
-		$r = common_friends_zcid($uid, $zcid, $a->pager['start'], $a->pager['itemspage']);
+		$common_friends = Model\GContact::commonFriendsZcid($uid, $zcid, $pager->getStart(), $pager->getItemsPerPage());
 	}
 
-
-	if (! dbm::is_result($r)) {
+	if (!DBA::isResult($common_friends)) {
 		return $o;
 	}
 
 	$id = 0;
 
-	foreach ($r as $rr) {
-
+	$entries = [];
+	foreach ($common_friends as $common_friend) {
 		//get further details of the contact
-		$contact_details = get_contact_details_by_url($rr['url'], $uid);
+		$contact_details = Model\Contact::getDetailsByURL($common_friend['url'], $uid);
 
 		// $rr['id'] is needed to use contact_photo_menu()
 		/// @TODO Adding '/" here avoids E_NOTICE on missing constants
-		$rr['id'] = $rr['cid'];
+		$common_friend['id'] = $common_friend['cid'];
 
-		$photo_menu = '';
-		$photo_menu = contact_photo_menu($rr);
+		$photo_menu = Model\Contact::photoMenu($common_friend);
 
-		$entry = array(
-			'url'          => $rr['url'],
-			'itemurl'      => (($contact_details['addr'] != "") ? $contact_details['addr'] : $rr['url']),
+		$entry = [
+			'url'          => Model\Contact::magicLink($common_friend['url']),
+			'itemurl'      => defaults($contact_details, 'addr', $common_friend['url']),
 			'name'         => $contact_details['name'],
-			'thumb'        => proxy_url($contact_details['thumb'], false, PROXY_SIZE_THUMB),
-			'img_hover'    => htmlentities($contact_details['name']),
+			'thumb'        => ProxyUtils::proxifyUrl($contact_details['thumb'], false, ProxyUtils::SIZE_THUMB),
+			'img_hover'    => $contact_details['name'],
 			'details'      => $contact_details['location'],
 			'tags'         => $contact_details['keywords'],
 			'about'        => $contact_details['about'],
-			'account_type' => account_type($contact_details),
-			'network'      => network_to_name($contact_details['network'], $contact_details['url']),
+			'account_type' => Model\Contact::getAccountType($contact_details),
+			'network'      => ContactSelector::networkToName($contact_details['network'], $contact_details['url']),
 			'photo_menu'   => $photo_menu,
 			'id'           => ++$id,
-		);
+		];
 		$entries[] = $entry;
 	}
 
-	if ($cmd === 'loc' && $cid && $uid == local_user()) {
-		$tab_str = contacts_tab($a, $cid, 4);
+	$title = '';
+	$tab_str = '';
+	if ($cmd === 'loc' && $cid && local_user() == $uid) {
+		$tab_str = Module\Contact::getTabsHTML($a, $contact, 4);
 	} else {
-		$title = t('Common Friends');
+		$title = L10n::t('Common Friends');
 	}
 
-	$tpl = get_markup_template('viewcontact_template.tpl');
+	$tpl = Renderer::getMarkupTemplate('viewcontact_template.tpl');
 
-	$o .= replace_macros($tpl,array(
+	$o .= Renderer::replaceMacros($tpl, [
 		'$title'    => $title,
 		'$tab_str'  => $tab_str,
 		'$contacts' => $entries,
-		'$paginate' => paginate($a),
-	));
+		'$paginate' => $pager->renderFull($total),
+	]);
 
 	return $o;
 }

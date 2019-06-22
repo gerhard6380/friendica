@@ -5,7 +5,7 @@ Database Tables
 
 | Table                                                | Description                                      |
 |------------------------------------------------------|--------------------------------------------------|
-| [addon](help/database/db_addon)                      | registered plugins                               |
+| [addon](help/database/db_addon)                      | registered addons                               |
 | [attach](help/database/db_attach)                    | file attachments                                 |
 | [auth_codes](help/database/db_auth_codes)            | OAuth usage                                      |
 | [cache](help/database/db_cache)                      | OEmbed cache                                     |
@@ -17,8 +17,6 @@ Database Tables
 | [conversation](help/database/db_conversation)        | Raw data and structure information for messages  |
 | [event](help/database/db_event)                      | Events                                           |
 | [fcontact](help/database/db_fcontact)                | friend suggestion stuff                          |
-| [ffinder](help/database/db_ffinder)                  | friend suggestion stuff                          |
-| [fserver](help/database/db_fserver)                  |                                                  |
 | [fsuggest](help/database/db_fsuggest)                | friend suggestion stuff                          |
 | [gcign](help/database/db_gcign)                      | contacts ignored by friend suggestions           |
 | [gcontact](help/database/db_gcontact)                | global contacts                                  |
@@ -26,10 +24,9 @@ Database Tables
 | [group](help/database/db_group)                      | privacy groups, group info                       |
 | [group_member](help/database/db_group_member)        | privacy groups, member info                      |
 | [gserver](help/database/db_gserver)                  |                                                  |
-| [hook](help/database/db_hook)                        | plugin hook registry                             |
+| [hook](help/database/db_hook)                        | addon hook registry                             |
 | [intro](help/database/db_intro)                      |                                                  |
 | [item](help/database/db_item)                        | all posts                                        |
-| [item_id](help/database/db_item_id)                  | other identifiers on other services for posts    |
 | [locks](help/database/db_locks)                      |                                                  |
 | [mail](help/database/db_mail)                        | private messages                                 |
 | [mailacct](help/database/db_mailacct)                |                                                  |
@@ -38,6 +35,7 @@ Database Tables
 | [notify-threads](help/database/db_notify-threads)    |                                                  |
 | [oembed](help/database/db_oembed)                    | cache for OEmbed queries                         |
 | [parsed_url](help/database/db_parsed_url)            | cache for "parse_url" queries                    |
+| [participation](help/database/db_participation)      | Storage for participation messages from Diaspora |
 | [pconfig](help/database/db_pconfig)                  | personal (per user) configuration storage        |
 | [photo](help/database/db_photo)                      | photo storage                                    |
 | [poll](help/database/db_poll)                        | data for polls                                   |
@@ -50,7 +48,6 @@ Database Tables
 | [search](help/database/db_search)                    |                                                  |
 | [session](help/database/db_session)                  | web session storage                              |
 | [sign](help/database/db_sign)                        | Diaspora signatures                              |
-| [spam](help/database/db_spam)                        | unfinished                                       |
 | [term](help/database/db_term)                        | item taxonomy (categories, tags, etc.) table     |
 | [thread](help/database/db_thread)                    |                                                  |
 | [tokens](help/database/db_tokens)                    | OAuth usage                                      |

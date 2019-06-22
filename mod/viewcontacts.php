@@ -1,128 +1,120 @@
 <?php
-require_once('include/Contact.php');
-require_once('include/contact_selectors.php');
+/**
+ * @file mod/viewcontacts.php
+ */
 
-function viewcontacts_init(App $a) {
+use Friendica\App;
+use Friendica\Content\ContactSelector;
+use Friendica\Content\Nav;
+use Friendica\Content\Pager;
+use Friendica\Core\Config;
+use Friendica\Core\L10n;
+use Friendica\Core\Protocol;
+use Friendica\Core\Renderer;
+use Friendica\Core\System;
+use Friendica\Database\DBA;
+use Friendica\Model\Contact;
+use Friendica\Model\Profile;
+use Friendica\Util\Proxy as ProxyUtils;
 
-	if((get_config('system','block_public')) && (! local_user()) && (! remote_user())) {
-		return;
+function viewcontacts_init(App $a)
+{
+	if (Config::get('system', 'block_public') && !local_user() && !remote_user()) {
+		throw new \Friendica\Network\HTTPException\ForbiddenException(L10n::t('Access denied.'));
 	}
 
-	nav_set_selected('home');
-
-	if($a->argc > 1) {
-		$nick = $a->argv[1];
-		$r = q("SELECT * FROM `user` WHERE `nickname` = '%s' AND `blocked` = 0 LIMIT 1",
-			dbesc($nick)
-		);
-
-		if (! dbm::is_result($r)) {
-			return;
-		}
-
-		$a->data['user'] = $r[0];
-		$a->profile_uid = $r[0]['uid'];
-		$is_owner = (local_user() && (local_user() == $a->profile_uid));
-
-		profile_load($a,$a->argv[1]);
+	if ($a->argc < 2) {
+		throw new \Friendica\Network\HTTPException\ForbiddenException(L10n::t('Access denied.'));
 	}
+
+	Nav::setSelected('home');
+
+	$user = DBA::selectFirst('user', [], ['nickname' => $a->argv[1], 'blocked' => false]);
+	if (!DBA::isResult($user)) {
+		throw new \Friendica\Network\HTTPException\NotFoundException();
+	}
+
+	$a->data['user'] = $user;
+	$a->profile_uid  = $user['uid'];
+
+	Profile::load($a, $a->argv[1]);
 }
 
-
-function viewcontacts_content(App $a) {
-	require_once("mod/proxy.php");
-
-	if((get_config('system','block_public')) && (! local_user()) && (! remote_user())) {
-		notice( t('Public access denied.') . EOL);
+function viewcontacts_content(App $a)
+{
+	if (Config::get('system', 'block_public') && !local_user() && !remote_user()) {
+		notice(L10n::t('Public access denied.') . EOL);
 		return;
 	}
 
-	$o = "";
+	$is_owner = $a->profile['profile_uid'] == local_user();
 
 	// tabs
-	$o .= profile_tabs($a,$is_owner, $a->data['user']['nickname']);
+	$o = Profile::getTabs($a, $is_owner, $a->data['user']['nickname']);
 
-	if(((! count($a->profile)) || ($a->profile['hide-friends']))) {
-		notice( t('Permission denied.') . EOL);
+	if (!count($a->profile) || $a->profile['hide-friends']) {
+		notice(L10n::t('Permission denied.') . EOL);
 		return $o;
 	}
 
-	$r = q("SELECT COUNT(*) AS `total` FROM `contact`
-		WHERE `uid` = %d AND NOT `blocked` AND NOT `pending`
-			AND NOT `hidden` AND NOT `archive`
-			AND `network` IN ('%s', '%s', '%s')",
-		intval($a->profile['uid']),
-		dbesc(NETWORK_DFRN),
-		dbesc(NETWORK_DIASPORA),
-		dbesc(NETWORK_OSTATUS)
-	);
-	if (dbm::is_result($r))
-		$a->set_pager_total($r[0]['total']);
+	$condition = [
+		'uid'     => $a->profile['uid'],
+		'blocked' => false,
+		'pending' => false,
+		'hidden'  => false,
+		'archive' => false,
+		'network' => [Protocol::ACTIVITYPUB, Protocol::DFRN, Protocol::DIASPORA, Protocol::OSTATUS]
+	];
 
-	$r = q("SELECT * FROM `contact`
-		WHERE `uid` = %d AND NOT `blocked` AND NOT `pending`
-			AND NOT `hidden` AND NOT `archive`
-			AND `network` IN ('%s', '%s', '%s')
-		ORDER BY `name` ASC LIMIT %d, %d",
-		intval($a->profile['uid']),
-		dbesc(NETWORK_DFRN),
-		dbesc(NETWORK_DIASPORA),
-		dbesc(NETWORK_OSTATUS),
-		intval($a->pager['start']),
-		intval($a->pager['itemspage'])
-	);
-	if (!dbm::is_result($r)) {
-		info(t('No contacts.').EOL);
+	$total = DBA::count('contact', $condition);
+
+	$pager = new Pager($a->query_string);
+
+	$params = ['order' => ['name' => false], 'limit' => [$pager->getStart(), $pager->getItemsPerPage()]];
+
+	$contacts_stmt = DBA::select('contact', [], $condition, $params);
+
+	if (!DBA::isResult($contacts_stmt)) {
+		info(L10n::t('No contacts.') . EOL);
 		return $o;
 	}
 
-	$contacts = array();
+	$contacts = [];
 
-	foreach ($r as $rr) {
+	while ($contact = DBA::fetch($contacts_stmt)) {
 		/// @TODO This triggers an E_NOTICE if 'self' is not there
-		if ($rr['self']) {
+		if ($contact['self']) {
 			continue;
 		}
 
-		$url = $rr['url'];
+		$contact_details = Contact::getDetailsByURL($contact['url'], $a->profile['uid'], $contact);
 
-		// route DFRN profiles through the redirect
-
-		$is_owner = ((local_user() && ($a->profile['profile_uid'] == local_user())) ? true : false);
-
-		if($is_owner && ($rr['network'] === NETWORK_DFRN) && ($rr['rel']))
-			$url = 'redir/' . $rr['id'];
-		else
-			$url = zrl($url);
-
-		$contact_details = get_contact_details_by_url($rr['url'], $a->profile['uid'], $rr);
-
-		$contacts[] = array(
-			'id' => $rr['id'],
-			'img_hover' => sprintf( t('Visit %s\'s profile [%s]'), $contact_details['name'], $rr['url']),
-			'photo_menu' => contact_photo_menu($rr),
-			'thumb' => proxy_url($contact_details['thumb'], false, PROXY_SIZE_THUMB),
-			'name' => htmlentities(substr($contact_details['name'],0,20)),
-			'username' => htmlentities($contact_details['name']),
-			'details'       => $contact_details['location'],
-			'tags'          => $contact_details['keywords'],
-			'about'         => $contact_details['about'],
-			'account_type'  => account_type($contact_details),
-			'url' => $url,
-			'sparkle' => '',
-			'itemurl' => (($contact_details['addr'] != "") ? $contact_details['addr'] : $rr['url']),
-			'network' => network_to_name($rr['network'], $rr['url']),
-		);
+		$contacts[] = [
+			'id'           => $contact['id'],
+			'img_hover'    => L10n::t('Visit %s\'s profile [%s]', $contact_details['name'], $contact['url']),
+			'photo_menu'   => Contact::photoMenu($contact),
+			'thumb'        => ProxyUtils::proxifyUrl($contact_details['thumb'], false, ProxyUtils::SIZE_THUMB),
+			'name'         => substr($contact_details['name'], 0, 20),
+			'username'     => $contact_details['name'],
+			'details'      => $contact_details['location'],
+			'tags'         => $contact_details['keywords'],
+			'about'        => $contact_details['about'],
+			'account_type' => Contact::getAccountType($contact_details),
+			'url'          => Contact::magicLink($contact['url']),
+			'sparkle'      => '',
+			'itemurl'      => (($contact_details['addr'] != "") ? $contact_details['addr'] : $contact['url']),
+			'network'      => ContactSelector::networkToName($contact['network'], $contact['url']),
+		];
 	}
 
+	DBA::close($contacts_stmt);
 
-	$tpl = get_markup_template("viewcontact_template.tpl");
-	$o .= replace_macros($tpl, array(
-		'$title' => t('Contacts'),
+	$tpl = Renderer::getMarkupTemplate("viewcontact_template.tpl");
+	$o .= Renderer::replaceMacros($tpl, [
+		'$title'    => L10n::t('Contacts'),
 		'$contacts' => $contacts,
-		'$paginate' => paginate($a),
-	));
-
+		'$paginate' => $pager->renderFull($total),
+	]);
 
 	return $o;
 }

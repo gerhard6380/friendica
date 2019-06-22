@@ -30,6 +30,14 @@
 				<div class="col-lg-8 col-md-8 col-sm-8 col-xs-12 profile-entry">{{$profile.fullname.1}}</div>
 			</div>
 
+			{{if $profile.membersince}}
+			<div id="aprofile-membersince" class="col-lg-12 col-md-12 col-sm-12 col-xs-12 aprofile">
+				<hr class="profile-separator">
+				<div class="col-lg-4 col-md-4 col-sm-4 col-xs-12 profile-label-name text-muted">{{$profile.membersince.0}}</div>
+				<div class="col-lg-8 col-md-8 col-sm-8 col-xs-12 profile-entry">{{$profile.membersince.1}}</div>
+			</div>
+			{{/if}}
+
 			{{if $profile.gender}}
 			<div id="aprofile-gender" class="col-lg-12 col-md-12 col-sm-12 col-xs-12 aprofile">
 				<hr class="profile-separator">
@@ -74,7 +82,7 @@
 			<div id="aprofile-homepage" class="col-lg-12 col-md-12 col-sm-12 col-xs-12 aprofile">
 				<hr class="profile-separator">
 				<div class="col-lg-4 col-md-4 col-sm-4 col-xs-12 profile-label-name text-muted">{{$profile.homepage.0}}</div>
-				<div class="col-lg-8 col-md-8 col-sm-8 col-xs-12 profile-entry">{{$profile.homepage.1}}</div>
+				<div class="col-lg-8 col-md-8 col-sm-8 col-xs-12 profile-entry">{{$profile.homepage.1 nofilter}}</div>
 			</div>
 			{{/if}}
 
@@ -82,7 +90,7 @@
 			<div id="aprofile-about" class="col-lg-12 col-md-12 col-sm-12 col-xs-12 aprofile">
 				<hr class="profile-separator">
 				<div class="col-lg-4 col-md-4 col-sm-4 col-xs-12 profile-label-name text-muted">{{$profile.about.0}}</div>
-				<div class="col-lg-8 col-md-8 col-sm-8 col-xs-12 profile-entry">{{$profile.about.1}}</div>
+				<div class="col-lg-8 col-md-8 col-sm-8 col-xs-12 profile-entry">{{$profile.about.1 nofilter}}</div>
 			</div>
 			{{/if}}
 
@@ -125,7 +133,7 @@
 			<div id="aprofile-interest" class="col-lg-12 col-md-12 col-sm-12 col-xs-12 aprofile">
 				<hr class="profile-separator">
 				<div class="col-lg-4 col-md-4 col-sm-4 col-xs-12 profile-label-name text-muted">{{$profile.interest.0}}</div>
-				<div class="col-lg-8 col-md-8 col-sm-8 col-xs-12 profile-entry">{{$profile.interest.1}}</div>
+				<div class="col-lg-8 col-md-8 col-sm-8 col-xs-12 profile-entry">{{$profile.interest.1 nofilter}}</div>
 			</div>
 			{{/if}}
 
@@ -133,7 +141,7 @@
 			<div id="aprofile-likes" class="col-lg-12 col-md-12 col-sm-12 col-xs-12 aprofile">
 				<hr class="profile-separator">
 				<div class="col-lg-4 col-md-4 col-sm-4 col-xs-12 profile-label-name text-muted">{{$profile.likes.0}}</div>
-				<div class="col-lg-8 col-md-8 col-sm-8 col-xs-12 profile-entry">{{$profile.likes.1}}</div>
+				<div class="col-lg-8 col-md-8 col-sm-8 col-xs-12 profile-entry">{{$profile.likes.1 nofilter}}</div>
 			</div>
 			{{/if}}
 
@@ -141,7 +149,7 @@
 			<div id="aprofile-dislikes" class="col-lg-12 col-md-12 col-sm-12 col-xs-12 aprofile">
 				<hr class="profile-separator">
 				<div class="col-lg-4 col-md-4 col-sm-4 col-xs-12 profile-label-name text-muted">{{$profile.dislikes.0}}</div>
-				<div class="col-lg-8 col-md-8 col-sm-8 col-xs-12 profile-entry">{{$profile.dislikes.1}}</div>
+				<div class="col-lg-8 col-md-8 col-sm-8 col-xs-12 profile-entry">{{$profile.dislikes.1 nofilter}}</div>
 			</div>
 			{{/if}}
 
@@ -149,16 +157,15 @@
 			<div id="aprofile-contact" class="col-lg-12 col-md-12 col-sm-12 col-xs-12 aprofile">
 				<hr class="profile-separator">
 				<div class="col-lg-4 col-md-4 col-sm-4 col-xs-12 profile-label-name text-muted">{{$profile.contact.0}}</div>
-				<div class="col-lg-8 col-md-8 col-sm-8 col-xs-12 profile-entry">{{$profile.contact.1}}</div>
+				<div class="col-lg-8 col-md-8 col-sm-8 col-xs-12 profile-entry">{{$profile.contact.1 nofilter}}</div>
 			</div>
 			{{/if}}
-
 
 			{{if $profile.music}}
 			<div id="aprofile-music" class="col-lg-12 col-md-12 col-sm-12 col-xs-12 aprofile">
 				<hr class="profile-separator">
 				<div class="col-lg-4 col-md-4 col-sm-4 col-xs-12 profile-label-name text-muted">{{$profile.music.0}}</div>
-				<div class="col-lg-8 col-md-8 col-sm-8 col-xs-12 profile-entry">{{$profile.music.1}}</div>
+				<div class="col-lg-8 col-md-8 col-sm-8 col-xs-12 profile-entry">{{$profile.music.1 nofilter}}</div>
 			</div>
 			{{/if}}
 
@@ -167,7 +174,7 @@
 			<div id="aprofile-book" class="col-lg-12 col-md-12 col-sm-12 col-xs-12 aprofile">
 				<hr class="profile-separator">
 				<div class="col-lg-4 col-md-4 col-sm-4 col-xs-12 profile-label-name text-muted">{{$profile.book.0}}</div>
-				<div class="col-lg-8 col-md-8 col-sm-8 col-xs-12 profile-entry">{{$profile.book.1}}</div>
+				<div class="col-lg-8 col-md-8 col-sm-8 col-xs-12 profile-entry">{{$profile.book.1 nofilter}}</div>
 			</div>
 			{{/if}}
 
@@ -176,7 +183,7 @@
 			<div id="aprofile-tv" class="col-lg-12 col-md-12 col-sm-12 col-xs-12 aprofile">
 				<hr class="profile-separator">
 				<div class="col-lg-4 col-md-4 col-sm-4 col-xs-12 profile-label-name text-muted">{{$profile.tv.0}}</div>
-				<div class="col-lg-8 col-md-8 col-sm-8 col-xs-12 profile-entry">{{$profile.tv.1}}</div>
+				<div class="col-lg-8 col-md-8 col-sm-8 col-xs-12 profile-entry">{{$profile.tv.1 nofilter}}</div>
 			</div>
 			{{/if}}
 
@@ -185,7 +192,7 @@
 			<div id="aprofile-film" class="col-lg-12 col-md-12 col-sm-12 col-xs-12 aprofile">
 				<hr class="profile-separator">
 				<div class="col-lg-4 col-md-4 col-sm-4 col-xs-12 profile-label-name text-muted">{{$profile.film.0}}</div>
-				<div class="col-lg-8 col-md-8 col-sm-8 col-xs-12 profile-entry">{{$profile.film.1}}</div>
+				<div class="col-lg-8 col-md-8 col-sm-8 col-xs-12 profile-entry">{{$profile.film.1 nofilter}}</div>
 			</div>
 			{{/if}}
 
@@ -194,7 +201,7 @@
 			<div id="aprofile-romance" class="col-lg-12 col-md-12 col-sm-12 col-xs-12 aprofile">
 				<hr class="profile-separator">
 				<div class="col-lg-4 col-md-4 col-sm-4 col-xs-12 profile-label-name text-muted">{{$profile.romance.0}}</div>
-				<div class="col-lg-8 col-md-8 col-sm-8 col-xs-12 profile-entry">{{$profile.romance.1}}</div>
+				<div class="col-lg-8 col-md-8 col-sm-8 col-xs-12 profile-entry">{{$profile.romance.1 nofilter}}</div>
 			</div>
 			{{/if}}
 
@@ -203,7 +210,7 @@
 			<div id="aprofile-work" class="col-lg-12 col-md-12 col-sm-12 col-xs-12 aprofile">
 			<hr class="profile-separator">
 			<div class="col-lg-4 col-md-4 col-sm-4 col-xs-12 profile-label-name text-muted">{{$profile.work.0}}</div>
-			<div class="col-lg-8 col-md-8 col-sm-8 col-xs-12 profile-entry">{{$profile.work.1}}</div>
+			<div class="col-lg-8 col-md-8 col-sm-8 col-xs-12 profile-entry">{{$profile.work.1 nofilter}}</div>
 			</div>
 			{{/if}}
 
@@ -211,7 +218,7 @@
 			<div id="aprofile-education" class="col-lg-12 col-md-12 col-sm-12 col-xs-12 aprofile">
 				<hr class="profile-separator">
 				<div class="col-lg-4 col-md-4 col-sm-4 col-xs-12 profile-label-name text-muted">{{$profile.education.0}}</div>
-				<div class="col-lg-8 col-md-8 col-sm-8 col-xs-12 profile-entry">{{$profile.education.1}}</div>
+				<div class="col-lg-8 col-md-8 col-sm-8 col-xs-12 profile-entry">{{$profile.education.1 nofilter}}</div>
 			</div>
 			{{/if}}
 
@@ -219,7 +226,7 @@
 			<div id="aprofile-forumlist" class="col-lg-12 col-md-12 col-sm-12 col-xs-12 aprofile">
 				<hr class="profile-separator">
 				<div class="col-lg-4 col-md-4 col-sm-4 col-xs-12 profile-label-name text-muted">{{$profile.forumlist.0}}</div>
-				<div class="col-lg-8 col-md-8 col-sm-8 col-xs-12 profile-entry">{{$profile.forumlist.1}}</div>
+				<div class="col-lg-8 col-md-8 col-sm-8 col-xs-12 profile-entry">{{$profile.forumlist.1 nofilter}}</div>
 			</div>
 			{{/if}}
 		</div>

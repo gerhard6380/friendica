@@ -41,7 +41,7 @@ img { border :0px; }
 	width: 384px;
 }
 
-code {
+pre code {
 	font-family: Courier, monospace;
 	white-space: pre;
 	display: block;
@@ -386,7 +386,7 @@ div.wall-item-content-wrapper.shiny {
 	margin-bottom: 10px;
 }
 
-.group-selected, .nets-selected, .fileas-selected, .categories-selected, .forum-selected {
+.widget .selected, .group-selected, .forum-selected {
 	padding: 3px;
 	-moz-border-radius: 3px;
 	border-radius: 3px;
@@ -725,6 +725,9 @@ input#dfrn-url {
 	width:175px;
 	height:175px;
 	padding: 12px;
+}
+#profile-photo-wrapper.crop-preview img {
+	padding: 0;
 }
 
 #profile-edit-profile-name-label,
@@ -1123,7 +1126,7 @@ input#dfrn-url {
 	/* add ellipsis on text overflow               */
 	/* this work on safari, opera, ie, chrome.     */
 	/* firefox users have to wait support or we    */
-	/* can use a jquery plugin http://bit.ly/zJskg */
+	/* can use a jquery addon http://bit.ly/zJskg */
 	text-overflow: ellipsis;
 	-o-text-overflow: ellipsis;
 	width: 100%;
@@ -2121,11 +2124,11 @@ a.mail-list-link {
 	list-style: none;
 }
 
-.nets-ul, .fileas-ul, .categories-ul, .datebrowse-ul {
+.nets-ul, .fileas-ul, .category-ul, .datebrowse-ul {
 	list-style-type: none;
 }
 
-.nets-ul li, .fileas-ul li, .categories-ul li, .datebrowse-ul li {
+.nets-ul li, .fileas-ul li, .category-ul li, .datebrowse-ul li {
 	margin-top: 10px;
 }
 
@@ -2136,11 +2139,11 @@ a.mail-list-link {
 	margin-left: 42px;
 }
 
-.fileas-link, .categories-link {
+.fileas-link, .category-link {
 	margin-left: 24px;
 }
 
-.fileas-all, .categories-all {
+.fileas-all, .category-all {
 	margin-left: 0px;
 }
 
@@ -2550,7 +2553,7 @@ aside input[type='text'] {
 }
 
 
-#plugin-settings-link, #account-settings-link {
+#addon-settings-link, #account-settings-link {
 	margin-bottom: 10px;
 }
 
@@ -2718,9 +2721,7 @@ aside input[type='text'] {
 }
 
 .settings-block {
-	border: 1px solid #AAA;
-	margin: 10px;
-	padding: 10px;
+	border-bottom: 1px solid #AAA;
 }
 
 .app-title {
@@ -3082,10 +3083,10 @@ aside input[type='text'] {
 	text-align: right;
 }
 
-#adminpage #pluginslist {
+#adminpage #addonslist {
 	margin: 0px; padding: 0px;
 }
-#adminpage .plugin {
+#adminpage .addon {
 	list-style: none;
 	display: block;
 	border: 1px solid #888888;
@@ -3093,8 +3094,8 @@ aside input[type='text'] {
 	margin-bottom: 5px;
 	clear: left;
 }
-#adminpage .plugin .desc { margin-left: 2.5em;}
-#adminpage .toggleplugin {
+#adminpage .addon .desc { margin-left: 2.5em;}
+#adminpage .toggleaddon {
 	float:left;
 	margin-right: 1em;
 }
@@ -3506,6 +3507,7 @@ div.jGrowl div.info {
 		width: 100%;
 		padding: 0.5em;
 		height: auto;
+		box-sizing: border-box;
 	}
 	aside:before {
 		content: ">>";
@@ -3552,10 +3554,6 @@ div.jGrowl div.info {
   float: left;
   margin: 0px 10px 10px 0px;
   position: relative;
-}
-.videos .video-top-wrapper .video-js {
-  width: 300px!important;
-  height: 232px!important;
 }
 .videos .video-top-wrapper .video-delete {
   position: absolute;

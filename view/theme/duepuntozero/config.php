@@ -3,66 +3,76 @@
  * Theme settings
  */
 
-function theme_content(App $a) {
+use Friendica\App;
+use Friendica\Core\Config;
+use Friendica\Core\L10n;
+use Friendica\Core\PConfig;
+use Friendica\Core\Renderer;
+use Friendica\Core\System;
+
+function theme_content(App $a)
+{
 	if (!local_user()) {
 		return;
 	}
 
-	$colorset = get_pconfig( local_user(), 'duepuntozero', 'colorset');
+	$colorset = PConfig::get(local_user(), 'duepuntozero', 'colorset');
 	$user = true;
 
 	return clean_form($a, $colorset, $user);
 }
 
-function theme_post(App $a) {
+function theme_post(App $a)
+{
 	if (! local_user()) {
 		return;
 	}
 
-	if (isset($_POST['duepuntozero-settings-submit'])){
-		set_pconfig(local_user(), 'duepuntozero', 'colorset', $_POST['duepuntozero_colorset']);
+	if (isset($_POST['duepuntozero-settings-submit'])) {
+		PConfig::set(local_user(), 'duepuntozero', 'colorset', $_POST['duepuntozero_colorset']);
 	}
 }
 
-function theme_admin(App $a) {
-	$colorset = get_config( 'duepuntozero', 'colorset');
+function theme_admin(App $a)
+{
+	$colorset = Config::get('duepuntozero', 'colorset');
 	$user = false;
 
 	return clean_form($a, $colorset, $user);
 }
 
-function theme_admin_post(App $a) {
-	if (isset($_POST['duepuntozero-settings-submit'])){
-		set_config('duepuntozero', 'colorset', $_POST['duepuntozero_colorset']);
+function theme_admin_post(App $a)
+{
+	if (isset($_POST['duepuntozero-settings-submit'])) {
+		Config::set('duepuntozero', 'colorset', $_POST['duepuntozero_colorset']);
 	}
 }
 
 /// @TODO $a is no longer used
-function clean_form(App $a, &$colorset, $user) {
-	$colorset = array(
-		'default'     =>t('default'),
-		'greenzero'   =>t('greenzero'),
-		'purplezero'  =>t('purplezero'),
-		'easterbunny' =>t('easterbunny'),
-		'darkzero'    =>t('darkzero'),
-		'comix'       =>t('comix'),
-		'slackr'      =>t('slackr'),
-	);
+function clean_form(App $a, &$colorset, $user)
+{
+	$colorset = [
+		'default'     => L10n::t('default'),
+		'greenzero'   => L10n::t('greenzero'),
+		'purplezero'  => L10n::t('purplezero'),
+		'easterbunny' => L10n::t('easterbunny'),
+		'darkzero'    => L10n::t('darkzero'),
+		'comix'       => L10n::t('comix'),
+		'slackr'      => L10n::t('slackr'),
+	];
 
 	if ($user) {
-		$color = get_pconfig(local_user(), 'duepuntozero', 'colorset');
+		$color = PConfig::get(local_user(), 'duepuntozero', 'colorset');
 	} else {
-		$color = get_config( 'duepuntozero', 'colorset');
+		$color = Config::get('duepuntozero', 'colorset');
 	}
 
-	$t = get_markup_template("theme_settings.tpl" );
-	/// @TODO No need for adding string here, $o is not defined
-	$o .= replace_macros($t, array(
-		'$submit'   => t('Submit'),
-		'$baseurl'  => App::get_baseurl(),
-		'$title'    => t("Theme settings"),
-		'$colorset' => array('duepuntozero_colorset', t('Variations'), $color, '', $colorset),
-	));
+	$t = Renderer::getMarkupTemplate("theme_settings.tpl");
+	$o = Renderer::replaceMacros($t, [
+		'$submit'   => L10n::t('Submit'),
+		'$title'    => L10n::t("Theme settings"),
+		'$colorset' => ['duepuntozero_colorset', L10n::t('Variations'), $color, '', $colorset],
+	]);
 
 	return $o;
 }

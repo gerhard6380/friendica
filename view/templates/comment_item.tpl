@@ -17,19 +17,19 @@
 					<a class="comment-edit-photo-link" href="{{$mylink}}" title="{{$mytitle}}"><img class="my-comment-photo" src="{{$myphoto}}" alt="{{$mytitle}}" title="{{$mytitle}}" /></a>
 				</div>
 				<div class="comment-edit-photo-end"></div>
-				<textarea id="comment-edit-text-{{$id}}" class="comment-edit-text-empty" name="body" placeholder="{{$comment}}" onFocus="commentOpen(this,{{$id}});" onBlur="commentClose(this,{{$id}});"></textarea>
+				<textarea id="comment-edit-text-{{$id}}" class="comment-edit-text-empty" name="body" placeholder="{{$comment}}" onFocus="commentOpen(this,{{$id}});" onBlur="commentClose(this,{{$id}});">{{if $threaded != false}}{{$default}}{{/if}}</textarea>
 				{{if $qcomment}}
 					<select id="qcomment-select-{{$id}}" name="qcomment-{{$id}}" class="qcomment" onchange="qCommentInsert(this,{{$id}});" >
 					<option value=""></option>
 				{{foreach $qcomment as $qc}}
-					<option value="{{$qc|escape:'html'}}">{{$qc}}</option>
+					<option value="{{$qc}}">{{$qc}}</option>
 				{{/foreach}}
 					</select>
 				{{/if}}
 
 				<div class="comment-edit-text-end"></div>
 				<div class="comment-edit-submit-wrapper" id="comment-edit-submit-wrapper-{{$id}}" style="display: none;" >
-					<input type="submit" onclick="post_comment({{$id}}); return false;" id="comment-edit-submit-{{$id}}" class="comment-edit-submit" name="submit" value="{{$submit|escape:'html'}}" />
+					<input type="submit" onclick="post_comment({{$id}}); return false;" id="comment-edit-submit-{{$id}}" class="comment-edit-submit" name="submit" value="{{$submit}}" />
 					{{if $preview}}<span onclick="preview_comment({{$id}});" id="comment-edit-preview-link-{{$id}}" class="fakelink">{{$preview}}</span>{{/if}}
 					<div id="comment-edit-preview-{{$id}}" class="comment-edit-preview" style="display:none;"></div>
 				</div>

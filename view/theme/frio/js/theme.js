@@ -282,7 +282,7 @@ $(document).ready(function(){
 	 * We are making an exception for buttons because of a race condition with the
 	 * comment opening button that results in an already closed comment UI.
 	 */
-	$(document).on('click', function(event) {
+	$(document).on('mousedown', function(event) {
 		if (event.target.type === 'button') {
 			return true;
 		}
@@ -315,6 +315,49 @@ $(document).ready(function(){
 	$(document).on('change', 'textarea', function(event) {
 		autosize.update(event.target);
 	});
+
+	/*
+	 * Sticky aside on page scroll
+	 * We enable the sticky aside only when window is wider than
+	 * 976px - which is the maximum width where the aside is shown in
+	 * mobile style - because on chrome-based browsers (desktop and
+	 * android) the sticky plugin in mobile style causes the browser to
+	 * scroll back to top the main content, making it impossible
+	 * to navigate.
+	 * A side effect is that the sitky aside isn't really responsive,
+	 * since is enabled or not at page loading time.
+	 */
+	if ($(window).width() > 976) {
+		$("aside").stick_in_parent({
+			offset_top: 100, // px, header + tab bar + spacing
+			recalc_every: 10
+		});
+		// recalculate sticky aside on clicks on <a> elements
+		// this handle height changes on expanding submenus
+		$("aside").on("click", "a", function(){
+			$(document.body).trigger("sticky_kit:recalc");
+		});
+	}
+
+	/*
+	 * Add or remove "aside-out" class to body tag
+	 * when the mobile aside is shown or hidden.
+	 * The class is used in css to disable scroll in page when the aside
+	 * is shown.
+	 */
+	$("aside")
+		.on("shown.bs.offcanvas", function() {
+			$("body").addClass("aside-out");
+		})
+		.on("hidden.bs.offcanvas", function() {
+			$("body").removeClass("aside-out");
+		});
+
+	// Event listener for 'Show & hide event map' button in the network stream.
+	$("body").on("click", ".event-map-btn", function() {
+		showHideEventMap(this);
+	});
+
 });
 
 function openClose(theID) {
@@ -329,28 +372,53 @@ function openClose(theID) {
 }
 
 function showHide(theID) {
-	if(document.getElementById(theID).style.display == "block") {
-		document.getElementById(theID).style.display = "none"
+	var elem = document.getElementById(theID);
+	var edit = document.getElementById("comment-edit-submit-wrapper-" + theID.match('[0-9$]+'));
+
+	if ($(elem).is(':visible')) {
+		if (!$(edit).is(':visible')) {
+			edit.style.display = "block";
+		}
+		else {
+			elem.style.display = "none";
+		}
 	}
 	else {
-		document.getElementById(theID).style.display = "block"
+		elem.style.display = "block";
 	}
 }
 
+// Show & hide event map in the network stream by button click.
+function showHideEventMap(elm) {
+	// Get the id of the map element - it should be provided through
+	// the atribute "data-map-id".
+	var mapID = elm.getAttribute('data-map-id');
 
-function showHideComments(id) {
-	if( $('#collapsed-comments-' + id).is(':visible')) {
-		$('#collapsed-comments-' + id).slideUp();
-		$('#hide-comments-' + id).html(window.showMore);
-		$('#hide-comments-total-' + id).show();
+	// Get translation labels.
+	var mapshow = elm.getAttribute('data-show-label');
+	var maphide = elm.getAttribute('data-hide-label');
+
+	// Change the button labels.
+	if (elm.innerText == mapshow) {
+		$('#' + elm.id).text(maphide);
+	} else {
+		$('#' + elm.id).text(mapshow);
 	}
-	else {
-		$('#collapsed-comments-' + id).slideDown();
-		$('#hide-comments-' + id).html(window.showFewer);
-		$('#hide-comments-total-' + id).hide();
+	// Because maps are iframe elements, we cant hide it through css (display: none).
+	// We solve this issue by putting the map outside the screen with css.
+	// So the first time the 'Show map' button is pressed we move the map
+	// element into the screen area.
+	var mappos = $('#' + mapID).css('position');
+
+	if (mappos === 'absolute') {
+		$('#' + mapID).hide();
+		$('#' + mapID).css({position: 'relative', left: 'auto', top: 'auto'});
+		openClose(mapID);
+	} else {
+		openClose(mapID);
 	}
+	return false;
 }
-
 
 function justifyPhotos() {
 	justifiedGalleryActive = true;
@@ -358,10 +426,10 @@ function justifyPhotos() {
 		margins: 3,
 		border: 0,
 		sizeRangeSuffixes: {
-			'lt100': '-2',
-			'lt240': '-2',
+			'lt48': '-6',
+			'lt80': '-5',
+			'lt300': '-4',
 			'lt320': '-2',
-			'lt500': '',
 			'lt640': '-1',
 			'lt1024': '-0'
 		}
@@ -373,8 +441,16 @@ function justifyPhotosAjax() {
 	$('#photo-album-contents').justifiedGallery('norewind').on('jg.complete', function(e){ justifiedGalleryActive = false; });
 }
 
+// Load a js script to the html head.
 function loadScript(url, callback) {
-	// Adding the script tag to the head as suggested before
+	// Check if the script is already in the html head.
+	var oscript = $('head script[src="' + url + '"]');
+
+	// Delete the old script from head.
+	if (oscript.length > 0) {
+		oscript.remove();
+	}
+	// Adding the script tag to the head as suggested before.
 	var head = document.getElementsByTagName('head')[0];
 	var script = document.createElement('script');
 	script.type = 'text/javascript';
@@ -385,7 +461,7 @@ function loadScript(url, callback) {
 	script.onreadystatechange = callback;
 	script.onload = callback;
 
-	// Fire the loading
+	// Fire the loading.
 	head.appendChild(script);
 }
 
@@ -447,27 +523,37 @@ function filter_replace(item) {
 	return item.name;
 }
 
-(function( $ ) {
+(function($) {
 	$.fn.contact_filter = function(backend_url, typ, autosubmit, onselect) {
-		if(typeof typ === 'undefined') typ = '';
-		if(typeof autosubmit === 'undefined') autosubmit = false;
+		if (typeof typ === 'undefined') {
+			typ = '';
+		}
+
+		if (typeof autosubmit === 'undefined') {
+			autosubmit = false;
+		}
 
 		// Autocomplete contacts
 		contacts = {
 			match: /(^)([^\n]+)$/,
 			index: 2,
-			search: function(term, callback) { contact_search(term, callback, backend_url, typ); },
+			search: function(term, callback) {contact_search(term, callback, backend_url, typ);},
 			replace: filter_replace,
-			template: contact_filter,
+			template: contact_filter
 		};
 
 		this.attr('autocomplete','off');
 		var a = this.textcomplete([contacts], {className:'accontacts', appendTo: '#contact-list'});
 
-		a.on('textComplete:select', function(e, value, strategy) { $(".dropdown-menu.textcomplete-dropdown.media-list").show(); });
+		if(autosubmit) {
+			a.on('textComplete:select', function(e,value,strategy) {submit_form(this);});
+		}
+
+		a.on('textComplete:select', function(e, value, strategy) {
+			$(".dropdown-menu.textcomplete-dropdown.media-list").show();
+		});
 	};
 })( jQuery );
-
 
 // current time in milliseconds, to send each request to make sure
 // we 're not getting 304 response
@@ -673,6 +759,7 @@ function doLikeAction(ident, verb) {
 	$.get('like/' + ident.toString() + '?verb=' + verb, NavUpdate );
 	liking = 1;
 	force_update = true;
+	update_item = ident.toString();
 }
 
 // Decodes a hexadecimally encoded binary string

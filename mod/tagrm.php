@@ -1,101 +1,119 @@
 <?php
+/**
+ * @file mod/tagrm.php
+ */
 
-require_once('include/bbcode.php');
+use Friendica\App;
+use Friendica\Content\Text\BBCode;
+use Friendica\Core\L10n;
+use Friendica\Database\DBA;
+use Friendica\Model\Item;
+use Friendica\Model\Term;
+use Friendica\Util\Strings;
 
-function tagrm_post(App $a) {
-
-	if (! local_user()) {
-		goaway(App::get_baseurl() . '/' . $_SESSION['photo_return']);
+function tagrm_post(App $a)
+{
+	if (!local_user()) {
+		$a->internalRedirect($_SESSION['photo_return']);
 	}
 
-	if ((x($_POST,'submit')) && ($_POST['submit'] === t('Cancel'))) {
-		goaway(App::get_baseurl() . '/' . $_SESSION['photo_return']);
+	if (!empty($_POST['submit']) && ($_POST['submit'] === L10n::t('Cancel'))) {
+		$a->internalRedirect($_SESSION['photo_return']);
 	}
 
-	$tag =  ((x($_POST,'tag'))  ? hex2bin(notags(trim($_POST['tag']))) : '');
-	$item = ((x($_POST,'item')) ? intval($_POST['item'])               : 0 );
-
-	$r = q("SELECT * FROM `item` WHERE `id` = %d AND `uid` = %d LIMIT 1",
-		intval($item),
-		intval(local_user())
-	);
-
-	if (! dbm::is_result($r)) {
-		goaway(App::get_baseurl() . '/' . $_SESSION['photo_return']);
+	$tags = [];
+	foreach (defaults($_POST, 'tag', []) as $tag) {
+		$tags[] = hex2bin(Strings::escapeTags(trim($tag)));
 	}
 
-	$arr = explode(',', $r[0]['tag']);
-	for ($x = 0; $x < count($arr); $x ++) {
-		if ($arr[$x] === $tag) {
-			unset($arr[$x]);
-			break;
+	$item_id = defaults($_POST,'item', 0);
+	update_tags($item_id, $tags);
+	info(L10n::t('Tag(s) removed') . EOL);
+
+	$a->internalRedirect($_SESSION['photo_return']);
+	// NOTREACHED
+}
+
+/**
+ * Updates tags from an item
+ *
+ * @param $item_id
+ * @param $tags array
+ * @throws Exception
+ */
+function update_tags($item_id, $tags){
+	if (empty($item_id) || empty($tags)){
+		return;
+	}
+
+	$item = Item::selectFirst(['tag'], ['id' => $item_id, 'uid' => local_user()]);
+	if (!DBA::isResult($item)) {
+		return;
+	}
+
+	$old_tags = explode(',', $item['tag']);
+
+	foreach ($tags as $new_tag) {
+		foreach ($old_tags as $index => $old_tag) {
+			if (strcmp($old_tag, $new_tag) == 0) {
+				unset($old_tags[$index]);
+				break;
+			}
 		}
 	}
 
-	$tag_str = implode(',',$arr);
-
-	q("UPDATE `item` SET `tag` = '%s' WHERE `id` = %d AND `uid` = %d",
-		dbesc($tag_str),
-		intval($item),
-		intval(local_user())
-	);
-
-	info( t('Tag removed') . EOL );
-	goaway(App::get_baseurl() . '/' . $_SESSION['photo_return']);
-
-	// NOTREACHED
-
+	$tag_str = implode(',', $old_tags);
+	Term::insertFromTagFieldByItemId($item_id, $tag_str);
 }
 
-
-
-function tagrm_content(App $a) {
-
+function tagrm_content(App $a)
+{
 	$o = '';
 
-	if (! local_user()) {
-		goaway(App::get_baseurl() . '/' . $_SESSION['photo_return']);
+	if (!local_user()) {
+		$a->internalRedirect($_SESSION['photo_return']);
 		// NOTREACHED
 	}
 
-	$item = (($a->argc > 1) ? intval($a->argv[1]) : 0);
-	if (! $item) {
-		goaway(App::get_baseurl() . '/' . $_SESSION['photo_return']);
+	if ($a->argc == 3) {
+		update_tags($a->argv[1], [Strings::escapeTags(trim(hex2bin($a->argv[2])))]);
+		$a->internalRedirect($_SESSION['photo_return']);
+	}
+
+	$item_id = (($a->argc > 1) ? intval($a->argv[1]) : 0);
+	if (!$item_id) {
+		$a->internalRedirect($_SESSION['photo_return']);
 		// NOTREACHED
 	}
 
-	$r = q("SELECT * FROM `item` WHERE `id` = %d AND `uid` = %d LIMIT 1",
-		intval($item),
-		intval(local_user())
-	);
-
-	if (! dbm::is_result($r)) {
-		goaway(App::get_baseurl() . '/' . $_SESSION['photo_return']);
+	$item = Item::selectFirst(['tag'], ['id' => $item_id, 'uid' => local_user()]);
+	if (!DBA::isResult($item)) {
+		$a->internalRedirect($_SESSION['photo_return']);
 	}
 
-	$arr = explode(',', $r[0]['tag']);
+	$arr = explode(',', $item['tag']);
 
-	if (! count($arr)) {
-		goaway(App::get_baseurl() . '/' . $_SESSION['photo_return']);
+
+	if (empty($item['tag'])) {
+		$a->internalRedirect($_SESSION['photo_return']);
 	}
 
-	$o .= '<h3>' . t('Remove Item Tag') . '</h3>';
+	$o .= '<h3>' . L10n::t('Remove Item Tag') . '</h3>';
 
-	$o .= '<p id="tag-remove-desc">' . t('Select a tag to remove: ') . '</p>';
+	$o .= '<p id="tag-remove-desc">' . L10n::t('Select a tag to remove: ') . '</p>';
 
 	$o .= '<form id="tagrm" action="tagrm" method="post" >';
-	$o .= '<input type="hidden" name="item" value="' . $item . '" />';
+	$o .= '<input type="hidden" name="item" value="' . $item_id . '" />';
 	$o .= '<ul>';
 
 	foreach ($arr as $x) {
-		$o .= '<li><input type="checkbox" name="tag" value="' . bin2hex($x) . '" >' . bbcode($x) . '</input></li>';
+		$o .= '<li><input type="checkbox" name="tag[]" value="' . bin2hex($x) . '" >' . BBCode::convert($x) . '</input></li>';
 	}
 
 	$o .= '</ul>';
-	$o .= '<input id="tagrm-submit" type="submit" name="submit" value="' . t('Remove') .'" />';
-	$o .= '<input id="tagrm-cancel" type="submit" name="submit" value="' . t('Cancel') .'" />';
+	$o .= '<input id="tagrm-submit" type="submit" name="submit" value="' . L10n::t('Remove') .'" />';
+	$o .= '<input id="tagrm-cancel" type="submit" name="submit" value="' . L10n::t('Cancel') .'" />';
 	$o .= '</form>';
 
 	return $o;
-
 }

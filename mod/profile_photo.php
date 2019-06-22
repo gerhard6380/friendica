@@ -1,55 +1,69 @@
 <?php
+/**
+ * @file mod/profile_photo.php
+ */
 
-require_once("include/Photo.php");
+use Friendica\App;
+use Friendica\BaseModule;
+use Friendica\Core\Config;
+use Friendica\Core\L10n;
+use Friendica\Core\Renderer;
+use Friendica\Core\System;
+use Friendica\Core\Worker;
+use Friendica\Database\DBA;
+use Friendica\Model\Contact;
+use Friendica\Model\Photo;
+use Friendica\Model\Profile;
+use Friendica\Object\Image;
+use Friendica\Util\Strings;
 
-function profile_photo_init(App $a) {
-
-	if (! local_user()) {
+function profile_photo_init(App $a)
+{
+	if (!local_user()) {
 		return;
 	}
 
-	profile_load($a,$a->user['nickname']);
-
+	Profile::load($a, $a->user['nickname']);
 }
 
-
-function profile_photo_post(App $a) {
-
-	if (! local_user()) {
-		notice ( t('Permission denied.') . EOL );
+function profile_photo_post(App $a)
+{
+	if (!local_user()) {
+		notice(L10n::t('Permission denied.') . EOL);
 		return;
 	}
 
-	check_form_security_token_redirectOnErr('/profile_photo', 'profile_photo');
+	BaseModule::checkFormSecurityTokenRedirectOnError('/profile_photo', 'profile_photo');
 
-	if((x($_POST,'cropfinal')) && ($_POST['cropfinal'] == 1)) {
+	if (!empty($_POST['cropfinal']) && $_POST['cropfinal'] == 1) {
 
 		// unless proven otherwise
 		$is_default_profile = 1;
 
-		if($_REQUEST['profile']) {
-			$r = q("select id, `is-default` from profile where id = %d and uid = %d limit 1",
-				intval($_REQUEST['profile']),
+		if ($_REQUEST['profile']) {
+			$r = q("select id, `is-default` from profile where id = %d and uid = %d limit 1", intval($_REQUEST['profile']),
 				intval(local_user())
 			);
-			if (dbm::is_result($r) && (! intval($r[0]['is-default'])))
+
+			if (DBA::isResult($r) && (!intval($r[0]['is-default']))) {
 				$is_default_profile = 0;
+			}
 		}
 
 
 
 		// phase 2 - we have finished cropping
 
-		if($a->argc != 2) {
-			notice( t('Image uploaded but image cropping failed.') . EOL );
+		if ($a->argc != 2) {
+			notice(L10n::t('Image uploaded but image cropping failed.') . EOL);
 			return;
 		}
 
 		$image_id = $a->argv[1];
 
-		if(substr($image_id,-2,1) == '-') {
-			$scale = substr($image_id,-1,1);
-			$image_id = substr($image_id,0,-2);
+		if (substr($image_id, -2, 1) == '-') {
+			$scale = substr($image_id, -1, 1);
+			$image_id = substr($image_id, 0, -2);
 		}
 
 
@@ -58,185 +72,169 @@ function profile_photo_post(App $a) {
 		$srcW = $_POST['xfinal'] - $srcX;
 		$srcH = $_POST['yfinal'] - $srcY;
 
-		$r = q("SELECT * FROM `photo` WHERE `resource-id` = '%s' AND `uid` = %d AND `scale` = %d LIMIT 1",
-			dbesc($image_id),
-			dbesc(local_user()),
-			intval($scale));
+		$base_image = Photo::selectFirst([], ['resource-id' => $image_id, 'uid' => local_user(), 'scale' => $scale]);
 
-		if (dbm::is_result($r)) {
+		$path = 'profile/' . $a->user['nickname'];
+		if (DBA::isResult($base_image)) {
 
-			$base_image = $r[0];
+			$Image = Photo::getImageForPhoto($base_image);
+			if ($Image->isValid()) {
+				$Image->crop(300, $srcX, $srcY, $srcW, $srcH);
 
-			$im = new Photo($base_image['data'], $base_image['type']);
-			if($im->is_valid()) {
-				$im->cropImage(175,$srcX,$srcY,$srcW,$srcH);
-
-				$r = $im->store(local_user(), 0, $base_image['resource-id'],$base_image['filename'], t('Profile Photos'), 4, $is_default_profile);
+				$r = Photo::store($Image, local_user(), 0, $base_image['resource-id'], $base_image['filename'],
+						L10n::t('Profile Photos'), 4, $is_default_profile);
 
 				if ($r === false) {
-					notice ( sprintf(t('Image size reduction [%s] failed.'),"175") . EOL );
+					notice(L10n::t('Image size reduction [%s] failed.', "300") . EOL);
 				}
 
-				$im->scaleImage(80);
+				$Image->scaleDown(80);
 
-				$r = $im->store(local_user(), 0, $base_image['resource-id'],$base_image['filename'], t('Profile Photos'), 5, $is_default_profile);
+				$r = Photo::store($Image, local_user(), 0, $base_image['resource-id'], $base_image['filename'],
+						L10n::t('Profile Photos'), 5, $is_default_profile);
 
 				if ($r === false) {
-					notice( sprintf(t('Image size reduction [%s] failed.'),"80") . EOL );
+					notice(L10n::t('Image size reduction [%s] failed.', "80") . EOL);
 				}
 
-				$im->scaleImage(48);
+				$Image->scaleDown(48);
 
-				$r = $im->store(local_user(), 0, $base_image['resource-id'],$base_image['filename'], t('Profile Photos'), 6, $is_default_profile);
+				$r = Photo::store($Image, local_user(), 0, $base_image['resource-id'], $base_image['filename'],
+						L10n::t('Profile Photos'), 6, $is_default_profile);
 
 				if ($r === false) {
-					notice( sprintf(t('Image size reduction [%s] failed.'),"48") . EOL );
+					notice(L10n::t('Image size reduction [%s] failed.', "48") . EOL);
 				}
 
 				// If setting for the default profile, unset the profile photo flag from any other photos I own
 
-				if($is_default_profile) {
-					$r = q("UPDATE `photo` SET `profile` = 0 WHERE `profile` = 1 AND `resource-id` != '%s' AND `uid` = %d",
-						dbesc($base_image['resource-id']),
-						intval(local_user())
-					);
-
-					$r = q("UPDATE `contact` SET `photo` = '%s', `thumb` = '%s', `micro` = '%s'  WHERE `self` AND `uid` = %d",
-						dbesc(App::get_baseurl() . '/photo/' . $base_image['resource-id'] . '-4.' . $im->getExt()),
-						dbesc(App::get_baseurl() . '/photo/' . $base_image['resource-id'] . '-5.' . $im->getExt()),
-						dbesc(App::get_baseurl() . '/photo/' . $base_image['resource-id'] . '-6.' . $im->getExt()),
-						intval(local_user())
+				if ($is_default_profile) {
+					q("UPDATE `photo` SET `profile` = 0 WHERE `profile` = 1 AND `resource-id` != '%s' AND `uid` = %d",
+						DBA::escape($base_image['resource-id']), intval(local_user())
 					);
 				} else {
-					$r = q("update profile set photo = '%s', thumb = '%s' where id = %d and uid = %d",
-						dbesc(App::get_baseurl() . '/photo/' . $base_image['resource-id'] . '-4.' . $im->getExt()),
-						dbesc(App::get_baseurl() . '/photo/' . $base_image['resource-id'] . '-5.' . $im->getExt()),
-						intval($_REQUEST['profile']),
-						intval(local_user())
+					q("update profile set photo = '%s', thumb = '%s' where id = %d and uid = %d",
+						DBA::escape(System::baseUrl() . '/photo/' . $base_image['resource-id'] . '-4.' . $Image->getExt()),
+						DBA::escape(System::baseUrl() . '/photo/' . $base_image['resource-id'] . '-5.' . $Image->getExt()),
+						intval($_REQUEST['profile']), intval(local_user())
 					);
 				}
 
-				// we'll set the updated profile-photo timestamp even if it isn't the default profile,
-				// so that browsers will do a cache update unconditionally
+				Contact::updateSelfFromUserID(local_user(), true);
 
-				$r = q("UPDATE `contact` SET `avatar-date` = '%s' WHERE `self` = 1 AND `uid` = %d",
-					dbesc(datetime_convert()),
-					intval(local_user())
-				);
-
-				info( t('Shift-reload the page or clear browser cache if the new photo does not display immediately.') . EOL);
+				info(L10n::t('Shift-reload the page or clear browser cache if the new photo does not display immediately.') . EOL);
 				// Update global directory in background
-				$url = App::get_baseurl() . '/profile/' . $a->user['nickname'];
-				if ($url && strlen(get_config('system','directory'))) {
-					proc_run(PRIORITY_LOW, "include/directory.php", $url);
+				if ($path && strlen(Config::get('system', 'directory'))) {
+					Worker::add(PRIORITY_LOW, "Directory", $a->getBaseURL() . '/' . $path);
 				}
 
-				require_once('include/profile_update.php');
-				profile_change();
+				Worker::add(PRIORITY_LOW, 'ProfileUpdate', local_user());
 			} else {
-				notice( t('Unable to process image') . EOL);
+				notice(L10n::t('Unable to process image') . EOL);
 			}
 		}
 
-		goaway(App::get_baseurl() . '/profiles');
+		$a->internalRedirect($path);
 		return; // NOTREACHED
 	}
 
-	$src      = $_FILES['userfile']['tmp_name'];
+	$src = $_FILES['userfile']['tmp_name'];
 	$filename = basename($_FILES['userfile']['name']);
 	$filesize = intval($_FILES['userfile']['size']);
 	$filetype = $_FILES['userfile']['type'];
 	if ($filetype == "") {
-		$filetype = guess_image_type($filename);
+		$filetype = Image::guessType($filename);
 	}
 
-	$maximagesize = get_config('system','maximagesize');
+	$maximagesize = Config::get('system', 'maximagesize');
 
 	if (($maximagesize) && ($filesize > $maximagesize)) {
-		notice( sprintf(t('Image exceeds size limit of %s'), formatBytes($maximagesize)) . EOL);
+		notice(L10n::t('Image exceeds size limit of %s', Strings::formatBytes($maximagesize)) . EOL);
 		@unlink($src);
 		return;
 	}
 
 	$imagedata = @file_get_contents($src);
-	$ph = new Photo($imagedata, $filetype);
+	$ph = new Image($imagedata, $filetype);
 
-	if (! $ph->is_valid()) {
-		notice( t('Unable to process image.') . EOL );
+	if (!$ph->isValid()) {
+		notice(L10n::t('Unable to process image.') . EOL);
 		@unlink($src);
 		return;
 	}
 
 	$ph->orient($src);
 	@unlink($src);
-	return profile_photo_crop_ui_head($a, $ph);
+
+	$imagecrop = profile_photo_crop_ui_head($a, $ph);
+	$a->internalRedirect('profile_photo/use/' . $imagecrop['hash']);
 }
 
+function profile_photo_content(App $a)
+{
 
-if(! function_exists('profile_photo_content')) {
-function profile_photo_content(App $a) {
-
-	if (! local_user()) {
-		notice( t('Permission denied.') . EOL );
+	if (!local_user()) {
+		notice(L10n::t('Permission denied.') . EOL);
 		return;
 	}
 
 	$newuser = false;
 
-	if($a->argc == 2 && $a->argv[1] === 'new')
+	if ($a->argc == 2 && $a->argv[1] === 'new') {
 		$newuser = true;
+	}
 
-	if( $a->argv[1]=='use'){
-		if ($a->argc<3){
-			notice( t('Permission denied.') . EOL );
-			return;
-		};
+	$imagecrop = [];
 
-//		check_form_security_token_redirectOnErr('/profile_photo', 'profile_photo');
+	if (isset($a->argv[1]) && $a->argv[1] == 'use' && $a->argc >= 3) {
+		// BaseModule::checkFormSecurityTokenRedirectOnError('/profile_photo', 'profile_photo');
 
 		$resource_id = $a->argv[2];
 		//die(":".local_user());
-		$r=q("SELECT * FROM `photo` WHERE `uid` = %d AND `resource-id` = '%s' ORDER BY `scale` ASC",
-			intval(local_user()),
-			dbesc($resource_id)
-			);
-		if (!dbm::is_result($r)){
-			notice( t('Permission denied.') . EOL );
+
+		$r = Photo::select([], ["resource-id" => $resource_id, "uid" => local_user()], ["order" => ["scale"=>false]]);
+
+		/*
+		$r = q("SELECT * FROM `photo` WHERE `uid` = %d AND `resource-id` = '%s' ORDER BY `scale` ASC", intval(local_user()),
+			DBA::escape($resource_id)
+		);
+		*/
+
+		if (!DBA::isResult($r)) {
+			notice(L10n::t('Permission denied.') . EOL);
 			return;
 		}
+
 		$havescale = false;
 		foreach ($r as $rr) {
-			if($rr['scale'] == 5)
+			if ($rr['scale'] == 5) {
 				$havescale = true;
+			}
 		}
 
 		// set an already uloaded photo as profile photo
 		// if photo is in 'Profile Photos', change it in db
-		if (($r[0]['album']== t('Profile Photos')) && ($havescale)){
-			$r=q("UPDATE `photo` SET `profile`=0 WHERE `profile`=1 AND `uid`=%d",
-				intval(local_user()));
+		if (($r[0]['album'] == L10n::t('Profile Photos')) && ($havescale)) {
+			q("UPDATE `photo` SET `profile`=0 WHERE `profile`=1 AND `uid`=%d", intval(local_user()));
 
-			$r=q("UPDATE `photo` SET `profile`=1 WHERE `uid` = %d AND `resource-id` = '%s'",
-				intval(local_user()),
-				dbesc($resource_id)
-				);
-
-			$r = q("UPDATE `contact` SET `avatar-date` = '%s' WHERE `self` = 1 AND `uid` = %d",
-				dbesc(datetime_convert()),
-				intval(local_user())
+			q("UPDATE `photo` SET `profile`=1 WHERE `uid` = %d AND `resource-id` = '%s'", intval(local_user()),
+				DBA::escape($resource_id)
 			);
+
+			Contact::updateSelfFromUserID(local_user(), true);
 
 			// Update global directory in background
 			$url = $_SESSION['my_url'];
-			if ($url && strlen(get_config('system','directory'))) {
-				proc_run(PRIORITY_LOW, "include/directory.php", $url);
+			if ($url && strlen(Config::get('system', 'directory'))) {
+				Worker::add(PRIORITY_LOW, "Directory", $url);
 			}
 
-			goaway(App::get_baseurl() . '/profiles');
+			$a->internalRedirect('profile/' . $a->user['nickname']);
 			return; // NOTREACHED
 		}
-		$ph = new Photo($r[0]['data'], $r[0]['type']);
-		profile_photo_crop_ui_head($a, $ph);
+		$ph = Photo::getImageForPhoto($r[0]);
+		
+		$imagecrop = profile_photo_crop_ui_head($a, $ph);
 		// go ahead as we have jus uploaded a new photo to crop
 	}
 
@@ -244,93 +242,92 @@ function profile_photo_content(App $a) {
 		intval(local_user())
 	);
 
+	if (empty($imagecrop)) {
+		$tpl = Renderer::getMarkupTemplate('profile_photo.tpl');
 
-	if(! x($a->config,'imagecrop')) {
-
-		$tpl = get_markup_template('profile_photo.tpl');
-
-		$o .= replace_macros($tpl,array(
+		$o = Renderer::replaceMacros($tpl,
+			[
 			'$user' => $a->user['nickname'],
-			'$lbl_upfile' => t('Upload File:'),
-			'$lbl_profiles' => t('Select a profile:'),
-			'$title' => t('Upload Profile Photo'),
-			'$submit' => t('Upload'),
+			'$lbl_upfile' => L10n::t('Upload File:'),
+			'$lbl_profiles' => L10n::t('Select a profile:'),
+			'$title' => L10n::t('Upload Profile Photo'),
+			'$submit' => L10n::t('Upload'),
 			'$profiles' => $profiles,
-			'$form_security_token' => get_form_security_token("profile_photo"),
-			'$select' => sprintf('%s %s', t('or'), ($newuser) ? '<a href="' . App::get_baseurl() . '">' . t('skip this step') . '</a>' : '<a href="'. App::get_baseurl() . '/photos/' . $a->user['nickname'] . '">' . t('select a photo from your photo albums') . '</a>')
-		));
+			'$form_security_token' => BaseModule::getFormSecurityToken("profile_photo"),
+			'$select' => sprintf('%s %s', L10n::t('or'),
+				($newuser) ? '<a href="' . System::baseUrl() . '">' . L10n::t('skip this step') . '</a>' : '<a href="' . System::baseUrl() . '/photos/' . $a->user['nickname'] . '">' . L10n::t('select a photo from your photo albums') . '</a>')
+		]);
 
 		return $o;
-	}
-	else {
-		$filename = $a->config['imagecrop'] . '-' . $a->config['imagecrop_resolution'] . '.'.$a->config['imagecrop_ext'];
-		$resolution = $a->config['imagecrop_resolution'];
-		$tpl = get_markup_template("cropbody.tpl");
-		$o .= replace_macros($tpl,array(
-			'$filename' => $filename,
-			'$profile' => intval($_REQUEST['profile']),
-			'$resource' => $a->config['imagecrop'] . '-' . $a->config['imagecrop_resolution'],
-			'$image_url' => App::get_baseurl() . '/photo/' . $filename,
-			'$title' => t('Crop Image'),
-			'$desc' => t('Please adjust the image cropping for optimum viewing.'),
-			'$form_security_token' => get_form_security_token("profile_photo"),
-			'$done' => t('Done Editing')
-		));
+	} else {
+		$filename = $imagecrop['hash'] . '-' . $imagecrop['resolution'] . '.' . $imagecrop['ext'];
+		$tpl = Renderer::getMarkupTemplate("cropbody.tpl");
+		$o = Renderer::replaceMacros($tpl,
+			[
+			'$filename'  => $filename,
+			'$profile'   => (isset($_REQUEST['profile']) ? intval($_REQUEST['profile']) : 0),
+			'$resource'  => $imagecrop['hash'] . '-' . $imagecrop['resolution'],
+			'$image_url' => System::baseUrl() . '/photo/' . $filename,
+			'$title'     => L10n::t('Crop Image'),
+			'$desc'      => L10n::t('Please adjust the image cropping for optimum viewing.'),
+			'$form_security_token' => BaseModule::getFormSecurityToken("profile_photo"),
+			'$done'      => L10n::t('Done Editing')
+		]);
 		return $o;
 	}
+}
 
-	return; // NOTREACHED
-}}
-
-
-if(! function_exists('profile_photo_crop_ui_head')) {
-function profile_photo_crop_ui_head(App $a, $ph) {
-	$max_length = get_config('system','max_image_length');
-	if (! $max_length) {
+function profile_photo_crop_ui_head(App $a, Image $image)
+{
+	$max_length = Config::get('system', 'max_image_length');
+	if (!$max_length) {
 		$max_length = MAX_IMAGE_LENGTH;
 	}
 	if ($max_length > 0) {
-		$ph->scaleImage($max_length);
+		$image->scaleDown($max_length);
 	}
 
-	$width = $ph->getWidth();
-	$height = $ph->getHeight();
+	$width = $image->getWidth();
+	$height = $image->getHeight();
 
 	if ($width < 175 || $height < 175) {
-		$ph->scaleImageUp(200);
-		$width = $ph->getWidth();
-		$height = $ph->getHeight();
+		$image->scaleUp(300);
+		$width = $image->getWidth();
+		$height = $image->getHeight();
 	}
 
-	$hash = photo_new_resource();
+	$hash = Photo::newResource();
 
 
 	$smallest = 0;
+	$filename = '';
 
-	$r = $ph->store(local_user(), 0 , $hash, $filename, t('Profile Photos'), 0 );
+	$r = Photo::store($image, local_user(), 0, $hash, $filename, L10n::t('Profile Photos'), 0);
 
 	if ($r) {
-		info( t('Image uploaded successfully.') . EOL );
+		info(L10n::t('Image uploaded successfully.') . EOL);
 	} else {
-		notice( t('Image upload failed.') . EOL );
+		notice(L10n::t('Image upload failed.') . EOL);
 	}
 
 	if ($width > 640 || $height > 640) {
-		$ph->scaleImage(640);
-		$r = $ph->store(local_user(), 0 , $hash, $filename, t('Profile Photos'), 1 );
+		$image->scaleDown(640);
+		$r = Photo::store($image, local_user(), 0, $hash, $filename, L10n::t('Profile Photos'), 1);
 
 		if ($r === false) {
-			notice( sprintf(t('Image size reduction [%s] failed.'),"640") . EOL );
+			notice(L10n::t('Image size reduction [%s] failed.', "640") . EOL);
 		} else {
 			$smallest = 1;
 		}
 	}
 
-	$a->config['imagecrop'] = $hash;
-	$a->config['imagecrop_resolution'] = $smallest;
-	$a->config['imagecrop_ext'] = $ph->getExt();
-	$a->page['htmlhead'] .= replace_macros(get_markup_template("crophead.tpl"), array());
-	$a->page['end'] .= replace_macros(get_markup_template("cropend.tpl"), array());
-	return;
-}}
+	$a->page['htmlhead'] .= Renderer::replaceMacros(Renderer::getMarkupTemplate("crophead.tpl"), []);
 
+	$imagecrop = [
+		'hash'       => $hash,
+		'resolution' => $smallest,
+		'ext'        => $image->getExt(),
+	];
+
+	return $imagecrop;
+}

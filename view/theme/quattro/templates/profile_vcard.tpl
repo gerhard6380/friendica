@@ -33,12 +33,12 @@
 
 	{{if $account_type}}<div class="account-type">{{$account_type}}</div>{{/if}}
 
-	{{if $profile.network_name}}<dl class="network"><dt class="network-label">{{$network}}</dt><dd class="x-network">{{$profile.network_name}}</dd></dl>{{/if}}
+	{{if $profile.network_link}}<dl class="network"><dt class="network-label">{{$network}}</dt><dd class="x-network">{{$profile.network_link nofilter}}</dd></dl>{{/if}}
 
 	{{if $location}}
 		<dl class="location"><dt class="location-label">{{$location}}</dt> 
 		<dd class="adr h-adr">
-			{{if $profile.address}}<div class="street-address p-street-address">{{$profile.address}}</div>{{/if}}
+			{{if $profile.address}}<div class="street-address p-street-address">{{$profile.address nofilter}}</div>{{/if}}
 			<span class="city-state-zip">
 				<span class="locality p-locality">{{$profile.locality}}</span>{{if $profile.locality}}, {{/if}}
 				<span class="region p-region">{{$profile.region}}</span>
@@ -89,6 +89,6 @@
 	</div>
 </div>
 
-{{$contact_block}}
+{{$contact_block nofilter}}
 
 

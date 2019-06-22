@@ -48,11 +48,11 @@ function enableOnUser(){
 
 </script>
 
-<script type="text/javascript" src="js/ajaxupload.js" >
+<script type="text/javascript" src="view/js/ajaxupload.js" >
 </script>
 
 <script>
-	var ispublic = '{{$ispublic}}';
+	var ispublic = '{{$ispublic nofilter}}';
 
 	$(document).ready(function() {
 
@@ -263,6 +263,6 @@ function enableOnUser(){
 	}
 
 
-	{{$geotag}}
+	{{$geotag nofilter}}
 
 </script>

@@ -1,25 +1,26 @@
 {{if $mode == display}}
 {{else}}
 {{if $item.comment_firstcollapsed}}
-	<div class="hide-comments-outer">
-		<span id="hide-comments-total-{{$item.id}}"
-			class="hide-comments-total">{{$item.num_comments}}</span>
-			<span id="hide-comments-{{$item.id}}"
-				class="hide-comments fakelink"
-				onclick="showHideComments({{$item.id}});">{{$item.hide_text}}</span>
-			{{if $item.thread_level==3}} -
-			<span id="hide-thread-{{$item}}-id"
-				class="fakelink"
-				onclick="showThread({{$item.id}});">expand</span> /
-			<span id="hide-thread-{{$item}}-id"
-				class="fakelink"
-				onclick="hideThread({{$item.id}});">collapse</span> thread{{/if}}
+	<div class="hide-comments-outer fakelink" onclick="showHideComments({{$item.id}});">
+		<span id="hide-comments-total-{{$item.id}}" class="hide-comments-total">
+			{{$item.num_comments}} - {{$item.show_text}}
+		</span>
+		<span id="hide-comments-{{$item.id}}" class="hide-comments" style="display: none">
+			{{$item.num_comments}} - {{$item.hide_text}}
+		</span>
 	</div>
 	<div id="collapsed-comments-{{$item.id}}" class="collapsed-comments" style="display: none;">
 {{/if}}
 {{/if}}
 
-{{if $item.thread_level!=1}}<div class="children u-comment h-cite">{{/if}}
+{{if $item.thread_level!=1}}
+<div class="children u-comment h-cite">
+{{else}}
+<span class="commented" style="display: none;">{{$item.commented}}</span>
+<span class="received" style="display: none;">{{$item.received}}</span>
+<span class="created" style="display: none;">{{$item.created_date}}</span>
+<span class="id" style="display: none;">{{$item.id}}</span>
+{{/if}}
 
 <div class="wall-item-decor">
 	{{if $item.star}}<span class="icon s22 star {{$item.isstarred}}" id="starred-{{$item.id}}" title="{{$item.star.starred}}">{{$item.star.starred}}</span>{{/if}}
@@ -38,7 +39,7 @@
 				</a>
 				<a href="#" rel="#wall-item-photo-menu-{{$item.id}}" class="contact-photo-menu-button icon s16 menu" id="wall-item-photo-menu-button-{{$item.id}}">menu</a>
 				<ul class="contact-menu menu-popup" id="wall-item-photo-menu-{{$item.id}}">
-				{{$item.item_photo_menu}}
+				{{$item.item_photo_menu nofilter}}
 				</ul>
 
 			</div>
@@ -49,29 +50,31 @@
 				</a>
 			</div>
 			{{/if}}
-			<div class="wall-item-location">{{$item.location}}</div>
+			<div class="wall-item-location">{{$item.location nofilter}}</div>
 		</div>
 		<div class="wall-item-content">
 			{{if $item.title}}<h2><a href="{{$item.plink.href}}" class="{{$item.sparkle}} p-name">{{$item.title}}</a></h2>{{/if}}
-			<span class="e-content {{if !$item.title}}p-name{{/if}}">{{$item.body}}</span>
+			<span class="wall-item-body e-content {{if !$item.title}}p-name{{/if}}">{{$item.body nofilter}}</span>
 		</div>
 	</div>
 	<div class="wall-item-bottom">
 		<div class="wall-item-links">
 		</div>
 		<div class="wall-item-tags">
+		{{if !$item.suppress_tags}}
 			{{foreach $item.hashtags as $tag}}
-				<span class='tag'>{{$tag}}</span>
+				<span class="tag">{{$tag nofilter}}</span>
 			{{/foreach}}
-  			{{foreach $item.mentions as $tag}}
-				<span class='mention'>{{$tag}}</span>
+			{{foreach $item.mentions as $tag}}
+				<span class="mention">{{$tag nofilter}}</span>
 			{{/foreach}}
-               {{foreach $item.folders as $cat}}
-                    <span class='folder p-category'>{{$cat.name}}</a>{{if $cat.removeurl}} (<a href="{{$cat.removeurl}}" title="{{$remove}}">x</a>) {{/if}} </span>
-               {{/foreach}}
-                {{foreach $item.categories as $cat}}
-                    <span class='category p-category'>{{$cat.name}}</a>{{if $cat.removeurl}} (<a href="{{$cat.removeurl}}" title="{{$remove}}">x</a>) {{/if}} </span>
-                {{/foreach}}
+			{{foreach $item.folders as $cat}}
+				<span class="folder p-category">{{$cat.name}}</a>{{if $cat.removeurl}} (<a href="{{$cat.removeurl}}" title="{{$remove}}">x</a>) {{/if}} </span>
+			{{/foreach}}
+			{{foreach $item.categories as $cat}}
+				<span class="category p-category">{{$cat.name}}</a>{{if $cat.removeurl}} (<a href="{{$cat.removeurl}}" title="{{$remove}}">x</a>) {{/if}} </span>
+			{{/foreach}}
+		{{/if}}
 		</div>
 	</div>
 	<div class="wall-item-bottom">
@@ -131,7 +134,7 @@
 					<input type="checkbox" title="{{$item.drop.select}}" name="itemselected[]" class="item-select" value="{{$item.id}}" />
 				{{/if}}
 				{{if $item.drop.dropping}}
-					<a href="item/drop/{{$item.id}}" onclick="return confirmDelete();" class="icon delete s16" title="{{$item.drop.delete}}">{{$item.drop.delete}}</a>
+					<a href="item/drop/{{$item.id}}/{{$item.return}}" onclick="return confirmDelete();" class="icon delete s16" title="{{$item.drop.delete}}">{{$item.drop.delete}}</a>
 				{{/if}}
 				{{if $item.edpost}}
 					<a class="icon edit s16" href="{{$item.edpost.0}}" title="{{$item.edpost.1}}"></a>
@@ -144,7 +147,7 @@
 		<div class="wall-item-links"></div>
 		{{if $item.responses}}
 			{{foreach $item.responses as $verb=>$response}}
-				<div class="wall-item-{{$verb}}" id="wall-item-{{$verb}}-{{$item.id}}">{{$response.output}}</div>
+				<div class="wall-item-{{$verb}}" id="wall-item-{{$verb}}-{{$item.id}}">{{$response.output nofilter}}</div>
 			{{/foreach}}
 		{{/if}}
 	</div>
@@ -153,7 +156,7 @@
 	<div class="wall-item-bottom commentbox">
 		<div class="wall-item-links"></div>
 		<div class="wall-item-comment-wrapper">
-					{{$item.comment}}
+					{{$item.comment nofilter}}
 		</div>
 	</div>
 	{{/if}}{{/if}}{{/if}}
@@ -178,10 +181,10 @@
 
 {{* top thread comment box *}}
 {{if $item.threaded}}{{if $item.comment}}{{if $item.thread_level==1}}
-<div class="wall-item-comment-wrapper" >{{$item.comment}}</div>
+<div class="wall-item-comment-wrapper" >{{$item.comment nofilter}}</div>
 {{/if}}{{/if}}{{/if}}
 
 
 {{if $item.flatten}}
-<div class="wall-item-comment-wrapper" >{{$item.comment}}</div>
+<div class="wall-item-comment-wrapper" >{{$item.comment nofilter}}</div>
 {{/if}}

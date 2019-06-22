@@ -1,71 +1,77 @@
 <?php
-
-require_once('include/security.php');
-require_once('include/bbcode.php');
-require_once('include/items.php');
-
+/**
+ * @file mod/tagger.php
+ */
+use Friendica\App;
+use Friendica\Core\Hook;
+use Friendica\Core\L10n;
+use Friendica\Core\Logger;
+use Friendica\Core\System;
+use Friendica\Core\Worker;
+use Friendica\Database\DBA;
+use Friendica\Model\Item;
+use Friendica\Util\Strings;
+use Friendica\Util\XML;
 
 function tagger_content(App $a) {
 
-	if(! local_user() && ! remote_user()) {
+	if (!local_user() && !remote_user()) {
 		return;
 	}
 
-	$term = notags(trim($_GET['term']));
+	$term = Strings::escapeTags(trim($_GET['term']));
 	// no commas allowed
-	$term = str_replace(array(',',' '),array('','_'),$term);
+	$term = str_replace([',',' '],['','_'],$term);
 
-	if(! $term)
-		return;
-
-	$item_id = (($a->argc > 1) ? notags(trim($a->argv[1])) : 0);
-
-	logger('tagger: tag ' . $term . ' item ' . $item_id);
-
-
-	$r = q("SELECT * FROM `item` WHERE `id` = '%s' LIMIT 1",
-		dbesc($item_id)
-	);
-
-	if(! $item_id || (! dbm::is_result($r))) {
-		logger('tagger: no item ' . $item_id);
+	if (!$term) {
 		return;
 	}
 
-	$item = $r[0];
+	$item_id = (($a->argc > 1) ? Strings::escapeTags(trim($a->argv[1])) : 0);
+
+	Logger::log('tagger: tag ' . $term . ' item ' . $item_id);
+
+
+	$item = Item::selectFirst([], ['id' => $item_id]);
+
+	if (!$item_id || !DBA::isResult($item)) {
+		Logger::log('tagger: no item ' . $item_id);
+		return;
+	}
 
 	$owner_uid = $item['uid'];
+	$blocktags = 0;
 
-	$r = q("select `nickname`,`blocktags` from user where uid = %d limit 1",
+	$r = q("select `blocktags` from user where uid = %d limit 1",
 		intval($owner_uid)
 	);
-	if (dbm::is_result($r)) {
-		$owner_nick = $r[0]['nickname'];
+	if (DBA::isResult($r)) {
 		$blocktags = $r[0]['blocktags'];
 	}
 
-	if(local_user() != $owner_uid)
+	if (local_user() != $owner_uid) {
 		return;
+	}
 
 	$r = q("select * from contact where self = 1 and uid = %d limit 1",
 		intval(local_user())
 	);
-	if (dbm::is_result($r))
+	if (DBA::isResult($r)) {
 			$contact = $r[0];
-	else {
-		logger('tagger: no contact_id');
+	} else {
+		Logger::log('tagger: no contact_id');
 		return;
 	}
 
-	$uri = item_new_uri($a->get_hostname(),$owner_uid);
-	$xterm = xmlify($term);
-	$post_type = (($item['resource-id']) ? t('photo') : t('status'));
+	$uri = Item::newURI($owner_uid);
+	$xterm = XML::escape($term);
+	$post_type = (($item['resource-id']) ? L10n::t('photo') : L10n::t('status'));
 	$targettype = (($item['resource-id']) ? ACTIVITY_OBJ_IMAGE : ACTIVITY_OBJ_NOTE );
+	$href = System::baseUrl() . '/display/' . $item['guid'];
 
-	$link = xmlify('<link rel="alternate" type="text/html" href="'
-		. App::get_baseurl() . '/display/' . $owner['nickname'] . '/' . $item['id'] . '" />' . "\n") ;
+	$link = XML::escape('<link rel="alternate" type="text/html" href="'. $href . '" />' . "\n");
 
-	$body = xmlify($item['body']);
+	$body = XML::escape($item['body']);
 
 	$target = <<< EOT
 	<target>
@@ -78,7 +84,7 @@ function tagger_content(App $a) {
 	</target>
 EOT;
 
-	$tagid = App::get_baseurl() . '/search?tag=' . $term;
+	$tagid = System::baseUrl() . '/search?tag=' . $xterm;
 	$objtype = ACTIVITY_OBJ_TAGTERM;
 
 	$obj = <<< EOT
@@ -92,21 +98,20 @@ EOT;
 	</object>
 EOT;
 
-	$bodyverb = t('%1$s tagged %2$s\'s %3$s with %4$s');
+	$bodyverb = L10n::t('%1$s tagged %2$s\'s %3$s with %4$s');
 
-	if (! isset($bodyverb)) {
+	if (!isset($bodyverb)) {
 		return;
 	}
 
-	$termlink = html_entity_decode('&#x2317;') . '[url=' . App::get_baseurl() . '/search?tag=' . urlencode($term) . ']'. $term . '[/url]';
+	$termlink = html_entity_decode('&#x2317;') . '[url=' . System::baseUrl() . '/search?tag=' . $term . ']'. $term . '[/url]';
 
-	$arr = array();
+	$arr = [];
 
-	$arr['guid'] = get_guid(32);
+	$arr['guid'] = System::createUUID();
 	$arr['uri'] = $uri;
 	$arr['uid'] = $owner_uid;
 	$arr['contact-id'] = $contact['id'];
-	$arr['type'] = 'activity';
 	$arr['wall'] = $item['wall'];
 	$arr['gravity'] = GRAVITY_COMMENT;
 	$arr['parent'] = $item['id'];
@@ -135,88 +140,61 @@ EOT;
 	$arr['deny_gid'] = $item['deny_gid'];
 	$arr['visible'] = 1;
 	$arr['unseen'] = 1;
-	$arr['last-child'] = 1;
 	$arr['origin'] = 1;
 
-	$post_id = item_store($arr);
+	$post_id = Item::insert($arr);
 
-//	q("UPDATE `item` set plink = '%s' where id = %d",
-//		dbesc(App::get_baseurl() . '/display/' . $owner_nick . '/' . $post_id),
-//		intval($post_id)
-//	);
-
-
-	if(! $item['visible']) {
-		$r = q("UPDATE `item` SET `visible` = 1 WHERE `id` = %d AND `uid` = %d",
-			intval($item['id']),
-			intval($owner_uid)
-		);
+	if (!$item['visible']) {
+		Item::update(['visible' => true], ['id' => $item['id']]);
 	}
 
-	$term_objtype = (($item['resource-id']) ? TERM_OBJ_PHOTO : TERM_OBJ_POST );
-        $t = q("SELECT count(tid) as tcount FROM term WHERE oid=%d AND term='%s'",
-                intval($item['id']),
-                dbesc($term)
-        );
-	if((! $blocktags) && $t[0]['tcount']==0 ) {
-		/*q("update item set tag = '%s' where id = %d",
-			dbesc($item['tag'] . (strlen($item['tag']) ? ',' : '') . '#[url=' . App::get_baseurl() . '/search?tag=' . $term . ']'. $term . '[/url]'),
-			intval($item['id'])
-		);*/
+	$term_objtype = ($item['resource-id'] ? TERM_OBJ_PHOTO : TERM_OBJ_POST);
 
+	$t = q("SELECT count(tid) as tcount FROM term WHERE oid=%d AND term='%s'",
+		intval($item['id']),
+		DBA::escape($term)
+	);
+
+	if (!$blocktags && $t[0]['tcount'] == 0) {
 		q("INSERT INTO term (oid, otype, type, term, url, uid) VALUE (%d, %d, %d, '%s', '%s', %d)",
 		   intval($item['id']),
 		   $term_objtype,
 		   TERM_HASHTAG,
-		   dbesc($term),
-		   dbesc(App::get_baseurl() . '/search?tag=' . $term),
+		   DBA::escape($term),
+		   '',
 		   intval($owner_uid)
 		);
 	}
 
 	// if the original post is on this site, update it.
-
-	$r = q("select `tag`,`id`,`uid` from item where `origin` = 1 AND `uri` = '%s' LIMIT 1",
-		dbesc($item['uri'])
-	);
-	if (dbm::is_result($r)) {
-		$x = q("SELECT `blocktags` FROM `user` WHERE `uid` = %d limit 1",
-			intval($r[0]['uid'])
+	$original_item = Item::selectFirst(['tag', 'id', 'uid'], ['origin' => true, 'uri' => $item['uri']]);
+	if (DBA::isResult($original_item)) {
+		$x = q("SELECT `blocktags` FROM `user` WHERE `uid`=%d LIMIT 1",
+			intval($original_item['uid'])
 		);
-		$t = q("SELECT count(tid) as tcount FROM term WHERE oid=%d AND term='%s'",
-			intval($r[0]['id']),
-			dbesc($term)
+		$t = q("SELECT COUNT(`tid`) AS `tcount` FROM `term` WHERE `oid`=%d AND `term`='%s'",
+			intval($original_item['id']),
+			DBA::escape($term)
 		);
-		if(count($x) && !$x[0]['blocktags'] && $t[0]['tcount']==0){
-			q("INSERT INTO term (oid, otype, type, term, url, uid) VALUE (%d, %d, %d, '%s', '%s', %d)",
-	                   intval($r[0]['id']),
-	                   $term_objtype,
-	                   TERM_HASHTAG,
-	                   dbesc($term),
-	                   dbesc(App::get_baseurl() . '/search?tag=' . $term),
-	                   intval($owner_uid)
-	                );
-		}
 
-		/*if(count($x) && !$x[0]['blocktags'] && (! stristr($r[0]['tag'], ']' . $term . '['))) {
-			q("update item set tag = '%s' where id = %d",
-				dbesc($r[0]['tag'] . (strlen($r[0]['tag']) ? ',' : '') . '#[url=' . App::get_baseurl() . '/search?tag=' . $term . ']'. $term . '[/url]'),
-				intval($r[0]['id'])
+		if (DBA::isResult($x) && !$x[0]['blocktags'] && $t[0]['tcount'] == 0){
+			q("INSERT INTO term (`oid`, `otype`, `type`, `term`, `url`, `uid`) VALUE (%d, %d, %d, '%s', '%s', %d)",
+				intval($original_item['id']),
+				$term_objtype,
+				TERM_HASHTAG,
+				DBA::escape($term),
+				'',
+				intval($owner_uid)
 			);
-		}*/
-
+		}
 	}
 
 
 	$arr['id'] = $post_id;
 
-	call_hooks('post_local_end', $arr);
+	Hook::callAll('post_local_end', $arr);
 
-	proc_run(PRIORITY_HIGH, "include/notifier.php", "tag", $post_id);
+	Worker::add(PRIORITY_HIGH, "Notifier", "tag", $post_id);
 
-	killme();
-
-	return; // NOTREACHED
-
-
+	exit();
 }

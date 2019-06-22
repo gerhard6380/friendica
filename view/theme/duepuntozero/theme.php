@@ -1,12 +1,17 @@
 <?php
 
+use Friendica\App;
+use Friendica\Core\Config;
+use Friendica\Core\PConfig;
+use Friendica\Core\Renderer;
+
 function duepuntozero_init(App $a) {
 
-set_template_engine($a, 'smarty3');
+Renderer::setActiveTemplateEngine('smarty3');
 
-    $colorset = get_pconfig( local_user(), 'duepuntozero','colorset');
+    $colorset = PConfig::get( local_user(), 'duepuntozero','colorset');
     if (!$colorset)
-       $colorset = get_config('duepuntozero', 'colorset');          // user setting have priority, then node settings
+       $colorset = Config::get('duepuntozero', 'colorset');          // user setting have priority, then node settings
     if ($colorset) {
         if ($colorset == 'greenzero')
             $a->page['htmlhead'] .= '<link rel="stylesheet" href="view/theme/duepuntozero/deriv/greenzero.css" type="text/css" media="screen" />'."\n";
@@ -35,19 +40,11 @@ function insertFormatting(BBcode, id) {
 	if (document.selection) {
 		textarea.focus();
 		selected = document.selection.createRange();
-		if (BBcode == "url") {
-			selected.text = "["+BBcode+"]" + "http://" +  selected.text + "[/"+BBcode+"]";
-		} else {
-			selected.text = "["+BBcode+"]" + selected.text + "[/"+BBcode+"]";
-		}
+		selected.text = "["+BBcode+"]" + selected.text + "[/"+BBcode+"]";
 	} else if (textarea.selectionStart || textarea.selectionStart == "0") {
 		var start = textarea.selectionStart;
 		var end = textarea.selectionEnd;
-		if (BBcode == "url") {
-			textarea.value = textarea.value.substring(0, start) + "["+BBcode+"]" + "http://" + textarea.value.substring(start, end) + "[/"+BBcode+"]" + textarea.value.substring(end, textarea.value.length);
-		} else {
-			textarea.value = textarea.value.substring(0, start) + "["+BBcode+"]" + textarea.value.substring(start, end) + "[/"+BBcode+"]" + textarea.value.substring(end, textarea.value.length);
-		}
+		textarea.value = textarea.value.substring(0, start) + "["+BBcode+"]" + textarea.value.substring(start, end) + "[/"+BBcode+"]" + textarea.value.substring(end, textarea.value.length);
 	}
 
 	return true;

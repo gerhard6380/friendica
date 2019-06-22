@@ -1,54 +1,60 @@
-<?php /** @file */
-
+<?php
 /**
- *
  * Poke, prod, finger, or otherwise do unspeakable things to somebody - who must be a connection in your address book
  * This function can be invoked with the required arguments (verb and cid and private and possibly parent) silently via ajax or
  * other web request. You must be logged in and connected to a profile.
  * If the required arguments aren't present, we'll display a simple form to choose a recipient and a verb.
  * parent is a special argument which let's you attach this activity as a comment to an existing conversation, which
  * may have started with somebody else poking (etc.) somebody, but this isn't necessary. This can be used in the more pokes
- * plugin version to have entire conversations where Alice poked Bob, Bob fingered Alice, Alice hugged Bob, etc.
+ * addon version to have entire conversations where Alice poked Bob, Bob fingered Alice, Alice hugged Bob, etc.
  *
  * private creates a private conversation with the recipient. Otherwise your profile's default post privacy is used.
  *
+ * @file mod/poke.php
  */
 
-require_once('include/security.php');
-require_once('include/bbcode.php');
-require_once('include/items.php');
+use Friendica\App;
+use Friendica\Core\Hook;
+use Friendica\Core\L10n;
+use Friendica\Core\Logger;
+use Friendica\Core\Renderer;
+use Friendica\Core\System;
+use Friendica\Database\DBA;
+use Friendica\Model\Item;
+use Friendica\Util\Strings;
+use Friendica\Util\XML;
 
-
-function poke_init(App $a) {
-
-	if (! local_user()) {
+function poke_init(App $a)
+{
+	if (!local_user()) {
 		return;
 	}
 
 	$uid = local_user();
-	$verb = notags(trim($_GET['verb']));
 
-	if (! $verb) {
+	if (empty($_GET['verb'])) {
 		return;
 	}
 
-	$verbs = get_poke_verbs();
+	$verb = Strings::escapeTags(trim($_GET['verb']));
 
-	if (! array_key_exists($verb,$verbs)) {
+	$verbs = L10n::getPokeVerbs();
+
+	if (!array_key_exists($verb, $verbs)) {
 		return;
 	}
 
 	$activity = ACTIVITY_POKE . '#' . urlencode($verbs[$verb][0]);
 
 	$contact_id = intval($_GET['cid']);
-	if (! $contact_id) {
+	if (!$contact_id) {
 		return;
 	}
 
-	$parent = ((x($_GET,'parent')) ? intval($_GET['parent']) : 0);
+	$parent = (!empty($_GET['parent']) ? intval($_GET['parent']) : 0);
 
 
-	logger('poke: verb ' . $verb . ' contact ' . $contact_id, LOGGER_DEBUG);
+	Logger::log('poke: verb ' . $verb . ' contact ' . $contact_id, Logger::DEBUG);
 
 
 	$r = q("SELECT * FROM `contact` WHERE `id` = %d AND `uid` = %d LIMIT 1",
@@ -56,50 +62,45 @@ function poke_init(App $a) {
 		intval($uid)
 	);
 
-	if (! dbm::is_result($r)) {
-		logger('poke: no contact ' . $contact_id);
+	if (!DBA::isResult($r)) {
+		Logger::log('poke: no contact ' . $contact_id);
 		return;
 	}
 
 	$target = $r[0];
 
-	if($parent) {
-		$r = q("SELECT `uri`, `private`, `allow_cid`, `allow_gid`, `deny_cid`, `deny_gid`
-			FROM `item` WHERE `id` = %d AND `parent` = %d AND `uid` = %d LIMIT 1",
-			intval($parent),
-			intval($parent),
-			intval($uid)
-		);
-		if (dbm::is_result($r)) {
-			$parent_uri = $r[0]['uri'];
-			$private    = $r[0]['private'];
-			$allow_cid  = $r[0]['allow_cid'];
-			$allow_gid  = $r[0]['allow_gid'];
-			$deny_cid   = $r[0]['deny_cid'];
-			$deny_gid   = $r[0]['deny_gid'];
+	if ($parent) {
+		$fields = ['uri', 'private', 'allow_cid', 'allow_gid', 'deny_cid', 'deny_gid'];
+		$condition = ['id' => $parent, 'parent' => $parent, 'uid' => $uid];
+		$item = Item::selectFirst($fields, $condition);
+
+		if (DBA::isResult($item)) {
+			$parent_uri = $item['uri'];
+			$private    = $item['private'];
+			$allow_cid  = $item['allow_cid'];
+			$allow_gid  = $item['allow_gid'];
+			$deny_cid   = $item['deny_cid'];
+			$deny_gid   = $item['deny_gid'];
 		}
-	}
-	else {
+	} else {
+		$private = (!empty($_GET['private']) ? intval($_GET['private']) : 0);
 
-		$private = ((x($_GET,'private')) ? intval($_GET['private']) : 0);
-
-		$allow_cid     = (($private) ? '<' . $target['id']. '>' : $a->user['allow_cid']);
-		$allow_gid     = (($private) ? '' : $a->user['allow_gid']);
-		$deny_cid      = (($private) ? '' : $a->user['deny_cid']);
-		$deny_gid      = (($private) ? '' : $a->user['deny_gid']);
+		$allow_cid     = ($private ? '<' . $target['id']. '>' : $a->user['allow_cid']);
+		$allow_gid     = ($private ? '' : $a->user['allow_gid']);
+		$deny_cid      = ($private ? '' : $a->user['deny_cid']);
+		$deny_gid      = ($private ? '' : $a->user['deny_gid']);
 	}
 
 	$poster = $a->contact;
 
-	$uri = item_new_uri($a->get_hostname(),$uid);
+	$uri = Item::newURI($uid);
 
-	$arr = array();
+	$arr = [];
 
-	$arr['guid']          = get_guid(32);
+	$arr['guid']          = System::createUUID();
 	$arr['uid']           = $uid;
 	$arr['uri']           = $uri;
-	$arr['parent-uri']    = (($parent_uri) ? $parent_uri : $uri);
-	$arr['type']          = 'activity';
+	$arr['parent-uri']    = (!empty($parent_uri) ? $parent_uri : $uri);
 	$arr['wall']          = 1;
 	$arr['contact-id']    = $poster['id'];
 	$arr['owner-name']    = $poster['name'];
@@ -113,98 +114,77 @@ function poke_init(App $a) {
 	$arr['allow_gid']     = $allow_gid;
 	$arr['deny_cid']      = $deny_cid;
 	$arr['deny_gid']      = $deny_gid;
-	$arr['last-child']    = 1;
 	$arr['visible']       = 1;
 	$arr['verb']          = $activity;
 	$arr['private']       = $private;
 	$arr['object-type']   = ACTIVITY_OBJ_PERSON;
 
 	$arr['origin']        = 1;
-	$arr['body']          = '[url=' . $poster['url'] . ']' . $poster['name'] . '[/url]' . ' ' . t($verbs[$verb][0]) . ' ' . '[url=' . $target['url'] . ']' . $target['name'] . '[/url]';
+	$arr['body']          = '[url=' . $poster['url'] . ']' . $poster['name'] . '[/url]' . ' ' . L10n::t($verbs[$verb][0]) . ' ' . '[url=' . $target['url'] . ']' . $target['name'] . '[/url]';
 
-	$arr['object'] = '<object><type>' . ACTIVITY_OBJ_PERSON . '</type><title>' . $target['name'] . '</title><id>' . App::get_baseurl() . '/contact/' . $target['id'] . '</id>';
-	$arr['object'] .= '<link>' . xmlify('<link rel="alternate" type="text/html" href="' . $target['url'] . '" />' . "\n");
+	$arr['object'] = '<object><type>' . ACTIVITY_OBJ_PERSON . '</type><title>' . $target['name'] . '</title><id>' . $target['url'] . '</id>';
+	$arr['object'] .= '<link>' . XML::escape('<link rel="alternate" type="text/html" href="' . $target['url'] . '" />' . "\n");
 
-	$arr['object'] .= xmlify('<link rel="photo" type="image/jpeg" href="' . $target['photo'] . '" />' . "\n");
+	$arr['object'] .= XML::escape('<link rel="photo" type="image/jpeg" href="' . $target['photo'] . '" />' . "\n");
 	$arr['object'] .= '</link></object>' . "\n";
 
-	$item_id = item_store($arr);
-	if($item_id) {
-		//q("UPDATE `item` SET `plink` = '%s' WHERE `uid` = %d AND `id` = %d",
-		//	dbesc(App::get_baseurl() . '/display/' . $poster['nickname'] . '/' . $item_id),
-		//	intval($uid),
-		//	intval($item_id)
-		//);
-		proc_run(PRIORITY_HIGH, "include/notifier.php", "tag", $item_id);
-	}
+	Item::insert($arr);
 
-
-	call_hooks('post_local_end', $arr);
-
-	proc_run(PRIORITY_HIGH, "include/notifier.php", "like", $post_id);
+	Hook::callAll('post_local_end', $arr);
 
 	return;
 }
 
-
-
-function poke_content(App $a) {
-
-	if (! local_user()) {
-		notice( t('Permission denied.') . EOL);
+function poke_content(App $a)
+{
+	if (!local_user()) {
+		notice(L10n::t('Permission denied.') . EOL);
 		return;
 	}
 
-	$name = '';
-	$id = '';
+	if (empty($_GET['c'])) {
+		return;
+	}
 
-	if(intval($_GET['c'])) {
-		$r = q("SELECT `id`,`name` FROM `contact` WHERE `id` = %d AND `uid` = %d LIMIT 1",
-			intval($_GET['c']),
-			intval(local_user())
-		);
-		if (dbm::is_result($r)) {
-			$name = $r[0]['name'];
-			$id = $r[0]['id'];
+	$contact = DBA::selectFirst('contact', ['id', 'name'], ['id' => $_GET['c'], 'uid' => local_user()]);
+	if (!DBA::isResult($contact)) {
+		return;
+	}
+
+	$name = $contact['name'];
+	$id = $contact['id'];
+
+	$head_tpl = Renderer::getMarkupTemplate('poke_head.tpl');
+	$a->page['htmlhead'] .= Renderer::replaceMacros($head_tpl,[
+		'$baseurl' => System::baseUrl(true),
+	]);
+
+	$parent = (!empty($_GET['parent']) ? intval($_GET['parent']) : '0');
+
+
+	$verbs = L10n::getPokeVerbs();
+
+	$shortlist = [];
+	foreach ($verbs as $k => $v) {
+		if ($v[1] !== 'NOTRANSLATION') {
+			$shortlist[] = [$k, $v[1]];
 		}
 	}
 
+	$tpl = Renderer::getMarkupTemplate('poke_content.tpl');
 
-	$base = App::get_baseurl();
-
-	$head_tpl = get_markup_template('poke_head.tpl');
-	$a->page['htmlhead'] .= replace_macros($head_tpl,array(
-		'$baseurl' => App::get_baseurl(true),
-		'$base' => $base
-	));
-
-
-	$parent = ((x($_GET,'parent')) ? intval($_GET['parent']) : '0');
-
-
-	$verbs = get_poke_verbs();
-
-	$shortlist = array();
-	foreach($verbs as $k => $v)
-		if($v[1] !== 'NOTRANSLATION')
-			$shortlist[] = array($k,$v[1]);
-
-
-	$tpl = get_markup_template('poke_content.tpl');
-
-	$o = replace_macros($tpl,array(
-		'$title' => t('Poke/Prod'),
-		'$desc' => t('poke, prod or do other things to somebody'),
-		'$clabel' => t('Recipient'),
-		'$choice' => t('Choose what you wish to do to recipient'),
+	$o = Renderer::replaceMacros($tpl,[
+		'$title' => L10n::t('Poke/Prod'),
+		'$desc' => L10n::t('poke, prod or do other things to somebody'),
+		'$clabel' => L10n::t('Recipient'),
+		'$choice' => L10n::t('Choose what you wish to do to recipient'),
 		'$verbs' => $shortlist,
 		'$parent' => $parent,
-		'$prv_desc' => t('Make this post private'),
-		'$submit' => t('Submit'),
+		'$prv_desc' => L10n::t('Make this post private'),
+		'$submit' => L10n::t('Submit'),
 		'$name' => $name,
 		'$id' => $id
-	));
+	]);
 
 	return $o;
-
 }

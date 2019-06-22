@@ -7,22 +7,22 @@
 <!DOCTYPE html >
 <html>
 <head>
-	<title><?php if(x($page,'title')) echo $page['title'] ?></title>
+	<title><?php if(!empty($page['title'])) echo $page['title'] ?></title>
 	<meta name="viewport" content="initial-scale=1.0">
 	<meta request="<?php echo htmlspecialchars($_REQUEST['pagename']) ?>">
-	<script>var baseurl="<?php echo App::get_baseurl() ?>";</script>
-	<script>var frio="<?php echo "view/theme/frio"; ?>";</script>
-	<?php $baseurl = App::get_baseurl(); ?>
+	<script type="text/javascript">var baseurl="<?php echo Friendica\Core\System::baseUrl() ?>";</script>
+	<script type="text/javascript">var frio="<?php echo "view/theme/frio"; ?>";</script>
+	<?php $baseurl = Friendica\Core\System::baseUrl(); ?>
 	<?php $frio = "view/theme/frio"; ?>
-	<?php if(x($page,'htmlhead')) echo $page['htmlhead']; ?>
+	<?php if(!empty($page['htmlhead'])) echo $page['htmlhead']; ?>
 </head>
-<body id=\"top\">";
+<body id="top">
 <?php if($_SERVER['REQUEST_URI'] == "/"){header('Location: /login');} ?>
 <a href="#content" class="sr-only sr-only-focusable">Skip to main content</a>
 <?php
-	if(x($page,'nav')) {
-	echo	str_replace("~config.sitename~",get_config('config','sitename'),
-			str_replace("~system.banner~",get_config('system','banner'),
+	if(!empty($page['nav'])) {
+	echo	str_replace("~config.sitename~",Friendica\Core\Config::get('config','sitename'),
+			str_replace("~system.banner~",Friendica\Core\Config::get('system','banner'),
 			$page['nav']
 	));};
 ?>
@@ -33,8 +33,8 @@
 <?php
 					echo"
 					<aside class=\"col-lg-3 col-md-3 hidden-sm hidden-xs\">
-						"; if(x($page,'aside')) echo $page['aside']; echo"
-						"; if(x($page,'right_aside')) echo $page['right_aside']; echo"
+						"; if(!empty($page['aside'])) echo $page['aside']; echo"
+						"; if(!empty($page['right_aside'])) echo $page['right_aside']; echo"
 						"; include('includes/photo_side.php'); echo"
 					</aside>
 
@@ -42,7 +42,7 @@
 						<section class=\"sectiontop\">
 								<div class=\"panel "; echo $a->argv[0]; echo "-content-wrapper\">
 									<div class=\"panel-body\">";
-										if(x($page,'content')) echo $page['content']; echo"
+										if(!empty($page['content'])) echo $page['content']; echo"
 										<div id=\"pause\"></div> <!-- The pause/resume Ajax indicator -->
 									</div>
 								</div>
@@ -106,7 +106,7 @@ $("nav").bind('nav-update', function(e,data)
 <script src="<?=$frio?>/frameworks/justifiedGallery/jquery.justifiedGallery.min.js"></script>
 
 <!-- Modal  -->
-<div id="modal" class="modal fade" tabindex="-1" role="dialog" aria-labelledby="plan-info" aria-hidden="true">
+<div id="modal" class="modal fade" tabindex="-1" role="dialog" aria-hidden="true">
 	<div class="modal-dialog modal-full-screen">
 		<div class="modal-content">
 			<div id="modal-header" class="modal-header">

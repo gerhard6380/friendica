@@ -1,180 +1,172 @@
 <?php
-require_once("include/contact_selectors.php");
-require_once("mod/contacts.php");
+/**
+ * @file mod/crepair.php
+ */
 
-function crepair_init(App $a) {
-	if (! local_user()) {
+use Friendica\App;
+use Friendica\Core\Config;
+use Friendica\Core\L10n;
+use Friendica\Core\Logger;
+use Friendica\Core\Protocol;
+use Friendica\Core\Renderer;
+use Friendica\Database\DBA;
+use Friendica\Model;
+use Friendica\Module;
+use Friendica\Util\Strings;
+
+function crepair_init(App $a)
+{
+	if (!local_user()) {
 		return;
-	}
-
-	$contact_id = 0;
-
-	if(($a->argc == 2) && intval($a->argv[1])) {
-		$contact_id = intval($a->argv[1]);
-		$r = q("SELECT * FROM `contact` WHERE `uid` = %d and `id` = %d LIMIT 1",
-			intval(local_user()),
-			intval($contact_id)
-		);
-		if (! dbm::is_result($r)) {
-			$contact_id = 0;
-		}
-	}
-
-	if(! x($a->page,'aside'))
-		$a->page['aside'] = '';
-
-	if($contact_id) {
-		$a->data['contact'] = $r[0];
-		$contact = $r[0];
-		profile_load($a, "", 0, get_contact_details_by_url($contact["url"]));
 	}
 }
 
-function crepair_post(App $a) {
-	if (! local_user()) {
+function crepair_post(App $a)
+{
+	if (!local_user()) {
 		return;
 	}
 
 	$cid = (($a->argc > 1) ? intval($a->argv[1]) : 0);
 
-	if($cid) {
-		$r = q("SELECT * FROM `contact` WHERE `id` = %d AND `uid` = %d LIMIT 1",
-			intval($cid),
-			intval(local_user())
-		);
+	$contact = null;
+	if ($cid) {
+		$contact = DBA::selectFirst('contact', [], ['id' => $cid, 'uid' => local_user()]);
 	}
 
-	if (! dbm::is_result($r)) {
+	if (!DBA::isResult($contact)) {
 		return;
 	}
 
-	$contact = $r[0];
+	$name        = defaults($_POST, 'name'       , $contact['name']);
+	$nick        = defaults($_POST, 'nick'       , '');
+	$url         = defaults($_POST, 'url'        , '');
+	$alias       = defaults($_POST, 'alias'      , '');
+	$request     = defaults($_POST, 'request'    , '');
+	$confirm     = defaults($_POST, 'confirm'    , '');
+	$notify      = defaults($_POST, 'notify'     , '');
+	$poll        = defaults($_POST, 'poll'       , '');
+	$attag       = defaults($_POST, 'attag'      , '');
+	$photo       = defaults($_POST, 'photo'      , '');
+	$remote_self = defaults($_POST, 'remote_self', false);
+	$nurl        = Strings::normaliseLink($url);
 
-	$name    = ((x($_POST,'name')) ? $_POST['name'] : $contact['name']);
-	$nick    = ((x($_POST,'nick')) ? $_POST['nick'] : '');
-	$url     = ((x($_POST,'url')) ? $_POST['url'] : '');
-	$request = ((x($_POST,'request')) ? $_POST['request'] : '');
-	$confirm = ((x($_POST,'confirm')) ? $_POST['confirm'] : '');
-	$notify  = ((x($_POST,'notify')) ? $_POST['notify'] : '');
-	$poll    = ((x($_POST,'poll')) ? $_POST['poll'] : '');
-	$attag   = ((x($_POST,'attag')) ? $_POST['attag'] : '');
-	$photo   = ((x($_POST,'photo')) ? $_POST['photo'] : '');
-	$remote_self = ((x($_POST,'remote_self')) ? $_POST['remote_self'] : false);
-	$nurl    = normalise_link($url);
-
-	$r = q("UPDATE `contact` SET `name` = '%s', `nick` = '%s', `url` = '%s', `nurl` = '%s', `request` = '%s', `confirm` = '%s', `notify` = '%s', `poll` = '%s', `attag` = '%s' , `remote_self` = %d
-		WHERE `id` = %d AND `uid` = %d",
-		dbesc($name),
-		dbesc($nick),
-		dbesc($url),
-		dbesc($nurl),
-		dbesc($request),
-		dbesc($confirm),
-		dbesc($notify),
-		dbesc($poll),
-		dbesc($attag),
-		intval($remote_self),
-		intval($contact['id']),
-		local_user()
+	$r = DBA::update(
+		'contact',
+		[
+			'name'        => $name,
+			'nick'        => $nick,
+			'url'         => $url,
+			'nurl'        => $nurl,
+			'alias'       => $alias,
+			'request'     => $request,
+			'confirm'     => $confirm,
+			'notify'      => $notify,
+			'poll'        => $poll,
+			'attag'       => $attag,
+			'remote_self' => $remote_self,
+		],
+		['id' => $contact['id'], 'uid' => local_user()]
 	);
 
-	if($photo) {
-		logger('mod-crepair: updating photo from ' . $photo);
-		require_once("include/Photo.php");
+	if ($photo) {
+		Logger::log('mod-crepair: updating photo from ' . $photo);
 
-		update_contact_avatar($photo,local_user(),$contact['id']);
+		Model\Contact::updateAvatar($photo, local_user(), $contact['id']);
 	}
 
-	if($r)
-		info( t('Contact settings applied.') . EOL);
-	else
-		notice( t('Contact update failed.') . EOL);
-
+	if ($r) {
+		info(L10n::t('Contact settings applied.') . EOL);
+	} else {
+		notice(L10n::t('Contact update failed.') . EOL);
+	}
 
 	return;
 }
 
-
-
-function crepair_content(App $a) {
-
-	if (! local_user()) {
-		notice( t('Permission denied.') . EOL);
+function crepair_content(App $a)
+{
+	if (!local_user()) {
+		notice(L10n::t('Permission denied.') . EOL);
 		return;
 	}
 
 	$cid = (($a->argc > 1) ? intval($a->argv[1]) : 0);
 
-	if($cid) {
-		$r = q("SELECT * FROM `contact` WHERE `id` = %d AND `uid` = %d LIMIT 1",
-			intval($cid),
-			intval(local_user())
-		);
+	$contact = null;
+	if ($cid) {
+		$contact = DBA::selectFirst('contact', [], ['id' => $cid, 'uid' => local_user()]);
 	}
 
-	if (! dbm::is_result($r)) {
-		notice( t('Contact not found.') . EOL);
+	if (!DBA::isResult($contact)) {
+		notice(L10n::t('Contact not found.') . EOL);
 		return;
 	}
 
-	$contact = $r[0];
+	if (empty($a->page['aside'])) {
+		$a->page['aside'] = '';
+	}
 
-	$warning = t('<strong>WARNING: This is highly advanced</strong> and if you enter incorrect information your communications with this contact may stop working.');
-	$info = t('Please use your browser \'Back\' button <strong>now</strong> if you are uncertain what to do on this page.');
+	if (DBA::isResult($contact)) {
+		$a->data['contact'] = $contact;
+		Model\Profile::load($a, "", 0, Model\Contact::getDetailsByURL($contact["url"]));
+	}
 
-	$returnaddr = "contacts/$cid";
+	$warning = L10n::t('<strong>WARNING: This is highly advanced</strong> and if you enter incorrect information your communications with this contact may stop working.');
+	$info = L10n::t('Please use your browser \'Back\' button <strong>now</strong> if you are uncertain what to do on this page.');
 
-	$allow_remote_self = get_config('system','allow_users_remote_self');
+	$returnaddr = "contact/$cid";
+
+	$allow_remote_self = Config::get('system', 'allow_users_remote_self');
 
 	// Disable remote self for everything except feeds.
 	// There is an issue when you repeat an item from maybe twitter and you got comments from friendica and twitter
 	// Problem is, you couldn't reply to both networks.
-	if (!in_array($contact['network'], array(NETWORK_FEED, NETWORK_DFRN, NETWORK_DIASPORA)))
+	if (!in_array($contact['network'], [Protocol::FEED, Protocol::DFRN, Protocol::DIASPORA, Protocol::TWITTER])) {
 		$allow_remote_self = false;
+	}
 
-	if ($contact['network'] == NETWORK_FEED)
-		$remote_self_options = array('0'=>t('No mirroring'), '1'=>t('Mirror as forwarded posting'), '2'=>t('Mirror as my own posting'));
-	else
-		$remote_self_options = array('0'=>t('No mirroring'), '2'=>t('Mirror as my own posting'));
+	if ($contact['network'] == Protocol::FEED) {
+		$remote_self_options = ['0' => L10n::t('No mirroring'), '1' => L10n::t('Mirror as forwarded posting'), '2' => L10n::t('Mirror as my own posting')];
+	} else {
+		$remote_self_options = ['0' => L10n::t('No mirroring'), '2' => L10n::t('Mirror as my own posting')];
+	}
 
-	$update_profile = in_array($contact['network'], array(NETWORK_DFRN, NETWORK_DSPR, NETWORK_OSTATUS));
+	$update_profile = in_array($contact['network'], [Protocol::ACTIVITYPUB, Protocol::DFRN, Protocol::DIASPORA, Protocol::OSTATUS]);
 
-	$tab_str = contacts_tab($a, $contact['id'], 5);
+	$tab_str = Module\Contact::getTabsHTML($a, $contact, 5);
 
-
-	$tpl = get_markup_template('crepair.tpl');
-	$o .= replace_macros($tpl, array(
-		//'$title'	=> t('Repair Contact Settings'),
-		'$tab_str'	=> $tab_str,
-		'$warning'	=> $warning,
-		'$info'		=> $info,
-		'$returnaddr'	=> $returnaddr,
-		'$return'	=> t('Return to contact editor'),
-		'$update_profile' => update_profile,
-		'$udprofilenow' => t('Refetch contact data'),
-		'$contact_id'	=> $contact['id'],
-		'$lbl_submit'	=> t('Submit'),
-
-		'$label_remote_self' => t('Remote Self'),
+	$tpl = Renderer::getMarkupTemplate('crepair.tpl');
+	$o = Renderer::replaceMacros($tpl, [
+		'$tab_str'        => $tab_str,
+		'$warning'        => $warning,
+		'$info'           => $info,
+		'$returnaddr'     => $returnaddr,
+		'$return'         => L10n::t('Return to contact editor'),
+		'$update_profile' => $update_profile,
+		'$udprofilenow'   => L10n::t('Refetch contact data'),
+		'$contact_id'     => $contact['id'],
+		'$lbl_submit'     => L10n::t('Submit'),
+		'$label_remote_self' => L10n::t('Remote Self'),
 		'$allow_remote_self' => $allow_remote_self,
-		'$remote_self' => array('remote_self',
-					t('Mirror postings from this contact'),
-					$contact['remote_self'],
-					t('Mark this contact as remote_self, this will cause friendica to repost new entries from this contact.'),
-					$remote_self_options
-				),
+		'$remote_self' => ['remote_self',
+			L10n::t('Mirror postings from this contact'),
+			$contact['remote_self'],
+			L10n::t('Mark this contact as remote_self, this will cause friendica to repost new entries from this contact.'),
+			$remote_self_options
+		],
 
-		'$name'		=> array('name', t('Name') , htmlentities($contact['name'])),
-		'$nick'		=> array('nick', t('Account Nickname'), htmlentities($contact['nick'])),
-		'$attag'	=> array('attag', t('@Tagname - overrides Name/Nickname'), $contact['attag']),
-		'$url'		=> array('url', t('Account URL'), $contact['url']),
-		'$request'	=> array('request', t('Friend Request URL'), $contact['request']),
-		'confirm'	=> array('confirm', t('Friend Confirm URL'), $contact['confirm']),
-		'notify'	=> array('notify', t('Notification Endpoint URL'), $contact['notify']),
-		'poll'		=> array('poll', t('Poll/Feed URL'), $contact['poll']),
-		'photo'		=> array('photo', t('New photo from this URL'), ''),
-	));
+		'$name'		=> ['name', L10n::t('Name') , $contact['name']],
+		'$nick'		=> ['nick', L10n::t('Account Nickname'), $contact['nick']],
+		'$attag'	=> ['attag', L10n::t('@Tagname - overrides Name/Nickname'), $contact['attag']],
+		'$url'		=> ['url', L10n::t('Account URL'), $contact['url']],
+		'$alias'	=> ['alias', L10n::t('Account URL Alias'), $contact['alias']],
+		'$request'	=> ['request', L10n::t('Friend Request URL'), $contact['request']],
+		'confirm'	=> ['confirm', L10n::t('Friend Confirm URL'), $contact['confirm']],
+		'notify'	=> ['notify', L10n::t('Notification Endpoint URL'), $contact['notify']],
+		'poll'		=> ['poll', L10n::t('Poll/Feed URL'), $contact['poll']],
+		'photo'		=> ['photo', L10n::t('New photo from this URL'), ''],
+	]);
 
 	return $o;
-
 }

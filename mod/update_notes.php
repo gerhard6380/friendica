@@ -5,6 +5,10 @@
  * Purpose: AJAX synchronisation of notes page
  */
 
+use Friendica\App;
+use Friendica\Core\L10n;
+use Friendica\Core\PConfig;
+
 require_once("mod/notes.php");
 
 function update_notes_content(App $a) {
@@ -28,12 +32,8 @@ function update_notes_content(App $a) {
 
 	$text = notes_content($a, $profile_uid);
 
-	$pattern = "/<img([^>]*) src=\"([^\"]*)\"/";
-	$replace = "<img\${1} dst=\"\${2}\"";
-	$text = preg_replace($pattern, $replace, $text);
-
-	if (get_pconfig(local_user(), "system", "bandwith_saver")) {
-		$replace = "<br />".t("[Embedded content - reload page to view]")."<br />";
+	if (PConfig::get(local_user(), "system", "bandwidth_saver")) {
+		$replace = "<br />".L10n::t("[Embedded content - reload page to view]")."<br />";
 		$pattern = "/<\s*audio[^>]*>(.*?)<\s*\/\s*audio>/i";
 		$text = preg_replace($pattern, $replace, $text);
 		$pattern = "/<\s*video[^>]*>(.*?)<\s*\/\s*video>/i";
@@ -48,5 +48,5 @@ function update_notes_content(App $a) {
 	echo str_replace("\t", "       ", $text);
 	echo "</section>";
 	echo "</body></html>\r\n";
-	killme();
+	exit();
 }

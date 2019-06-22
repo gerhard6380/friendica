@@ -1,40 +1,46 @@
 <?php
-
 /**
  * @file mod/wall_upload.php
  * @brief Module for uploading a picture to the profile wall
- * 
+ *
  * By default the picture will be stored in the photo album with the name Wall Photos.
  * You can specify a different album by adding an optional query string "album="
  * to the url
  */
 
-use \Friendica\Core\Config;
+use Friendica\App;
+use Friendica\Core\L10n;
+use Friendica\Core\Logger;
+use Friendica\Core\System;
+use Friendica\Core\Config;
+use Friendica\Database\DBA;
+use Friendica\Model\Contact;
+use Friendica\Model\Photo;
+use Friendica\Model\User;
+use Friendica\Object\Image;
+use Friendica\Util\Strings;
 
-require_once 'include/Photo.php';
+function wall_upload_post(App $a, $desktopmode = true)
+{
+	Logger::log("wall upload: starting new upload", Logger::DEBUG);
 
-
-function wall_upload_post(App $a, $desktopmode = true) {
-
-	logger("wall upload: starting new upload", LOGGER_DEBUG);
-
-	$r_json = (x($_GET, 'response') && $_GET['response'] == 'json');
-	$album = (x($_GET, 'album') ? notags(trim($_GET['album'])) : '');
+	$r_json = (!empty($_GET['response']) && $_GET['response'] == 'json');
+	$album = (!empty($_GET['album']) ? Strings::escapeTags(trim($_GET['album'])) : '');
 
 	if ($a->argc > 1) {
-		if (! x($_FILES, 'media')) {
+		if (empty($_FILES['media'])) {
 			$nick = $a->argv[1];
 			$r = q("SELECT `user`.*, `contact`.`id` FROM `user`
 				INNER JOIN `contact` on `user`.`uid` = `contact`.`uid`
 				WHERE `user`.`nickname` = '%s' AND `user`.`blocked` = 0
 				AND `contact`.`self` = 1 LIMIT 1",
-				dbesc($nick)
+				DBA::escape($nick)
 			);
 
-			if (! dbm::is_result($r)) {
+			if (!DBA::isResult($r)) {
 				if ($r_json) {
-					echo json_encode(array('error'=>t('Invalid request.')));
-					killme();
+					echo json_encode(['error' => L10n::t('Invalid request.')]);
+					exit();
 				}
 				return;
 			}
@@ -44,13 +50,13 @@ function wall_upload_post(App $a, $desktopmode = true) {
 				INNER JOIN `contact` on `user`.`uid` = `contact`.`uid`
 				WHERE `user`.`nickname` = '%s' AND `user`.`blocked` = 0
 				AND `contact`.`self` = 1 LIMIT 1",
-				dbesc($user_info['screen_name'])
+				DBA::escape($user_info['screen_name'])
 			);
 		}
 	} else {
 		if ($r_json) {
-			echo json_encode(array('error'=>t('Invalid request.')));
-			killme();
+			echo json_encode(['error' => L10n::t('Invalid request.')]);
+			exit();
 		}
 		return;
 	}
@@ -64,7 +70,7 @@ function wall_upload_post(App $a, $desktopmode = true) {
 	$page_owner_uid   = $r[0]['uid'];
 	$default_cid      = $r[0]['id'];
 	$page_owner_nick  = $r[0]['nickname'];
-	$community_page   = (($r[0]['page-flags'] == PAGE_COMMUNITY) ? true : false);
+	$community_page   = (($r[0]['page-flags'] == User::PAGE_FLAGS_COMMUNITY) ? true : false);
 
 	if ((local_user()) && (local_user() == $page_owner_uid)) {
 		$can_post = true;
@@ -87,7 +93,7 @@ function wall_upload_post(App $a, $desktopmode = true) {
 					intval($contact_id),
 					intval($page_owner_uid)
 				);
-				if (dbm::is_result($r)) {
+				if (DBA::isResult($r)) {
 					$can_post = true;
 					$visitor = $contact_id;
 				}
@@ -96,62 +102,73 @@ function wall_upload_post(App $a, $desktopmode = true) {
 	}
 
 
-	if (! $can_post) {
+	if (!$can_post) {
 		if ($r_json) {
-			echo json_encode(array('error'=>t('Permission denied.')));
-			killme();
+			echo json_encode(['error' => L10n::t('Permission denied.')]);
+			exit();
 		}
-		notice(t('Permission denied.') . EOL);
-		killme();
+		notice(L10n::t('Permission denied.') . EOL);
+		exit();
 	}
 
-	if (! x($_FILES, 'userfile') && ! x($_FILES, 'media')) {
+	if (empty($_FILES['userfile']) && empty($_FILES['media'])) {
 		if ($r_json) {
-			echo json_encode(array('error'=>t('Invalid request.')));
+			echo json_encode(['error' => L10n::t('Invalid request.')]);
 		}
-		killme();
+		exit();
 	}
 
-	$src = "";
-	if (x($_FILES, 'userfile')) {
+	$src = '';
+	$filename = '';
+	$filesize = 0;
+	$filetype = '';
+	if (!empty($_FILES['userfile'])) {
 		$src      = $_FILES['userfile']['tmp_name'];
 		$filename = basename($_FILES['userfile']['name']);
 		$filesize = intval($_FILES['userfile']['size']);
 		$filetype = $_FILES['userfile']['type'];
 
-	} elseif (x($_FILES, 'media')) {
-		if (is_array($_FILES['media']['tmp_name'])) {
-			$src = $_FILES['media']['tmp_name'][0];
-		} else {
-			$src = $_FILES['media']['tmp_name'];
+	} elseif (!empty($_FILES['media'])) {
+		if (!empty($_FILES['media']['tmp_name'])) {
+			if (is_array($_FILES['media']['tmp_name'])) {
+				$src = $_FILES['media']['tmp_name'][0];
+			} else {
+				$src = $_FILES['media']['tmp_name'];
+			}
 		}
 
-		if (is_array($_FILES['media']['name'])) {
-			$filename = basename($_FILES['media']['name'][0]);
-		} else {
-			$filename = basename($_FILES['media']['name']);
+		if (!empty($_FILES['media']['name'])) {
+			if (is_array($_FILES['media']['name'])) {
+				$filename = basename($_FILES['media']['name'][0]);
+			} else {
+				$filename = basename($_FILES['media']['name']);
+			}
 		}
 
-		if (is_array($_FILES['media']['size'])) {
-			$filesize = intval($_FILES['media']['size'][0]);
-		} else {
-			$filesize = intval($_FILES['media']['size']);
+		if (!empty($_FILES['media']['size'])) {
+			if (is_array($_FILES['media']['size'])) {
+				$filesize = intval($_FILES['media']['size'][0]);
+			} else {
+				$filesize = intval($_FILES['media']['size']);
+			}
 		}
 
-		if (is_array($_FILES['media']['type'])) {
-			$filetype = $_FILES['media']['type'][0];
-		} else {
-			$filetype = $_FILES['media']['type'];
+		if (!empty($_FILES['media']['type'])) {
+			if (is_array($_FILES['media']['type'])) {
+				$filetype = $_FILES['media']['type'][0];
+			} else {
+				$filetype = $_FILES['media']['type'];
+			}
 		}
 	}
 
-	if ($src=="") {
+	if ($src == "") {
 		if ($r_json) {
-			echo json_encode(array('error'=>t('Invalid request.')));
-			killme();
+			echo json_encode(['error' => L10n::t('Invalid request.')]);
+			exit();
 		}
-		notice(t('Invalid request.').EOL);
-		killme();
+		notice(L10n::t('Invalid request.').EOL);
+		exit();
 	}
 
 	// This is a special treatment for picture upload from Twidere
@@ -160,8 +177,8 @@ function wall_upload_post(App $a, $desktopmode = true) {
 		$filetype = "";
 	}
 
-	if ($filetype=="") {
-		$filetype=guess_image_type($filename);
+	if ($filetype == "") {
+		$filetype = Image::guessType($filename);
 	}
 
 	// If there is a temp name, then do a manual check
@@ -172,114 +189,89 @@ function wall_upload_post(App $a, $desktopmode = true) {
 		$filetype = $imagedata['mime'];
 	}
 
-	logger("File upload src: " . $src . " - filename: " . $filename .
-		" - size: " . $filesize . " - type: " . $filetype, LOGGER_DEBUG);
+	Logger::log("File upload src: " . $src . " - filename: " . $filename .
+		" - size: " . $filesize . " - type: " . $filetype, Logger::DEBUG);
 
 	$maximagesize = Config::get('system', 'maximagesize');
 
 	if (($maximagesize) && ($filesize > $maximagesize)) {
-		$msg = sprintf(t('Image exceeds size limit of %s'), formatBytes($maximagesize));
+		$msg = L10n::t('Image exceeds size limit of %s', Strings::formatBytes($maximagesize));
 		if ($r_json) {
-			echo json_encode(array('error'=>$msg));
+			echo json_encode(['error' => $msg]);
 		} else {
 			echo  $msg. EOL;
 		}
 		@unlink($src);
-		killme();
-	}
-
-
-	$limit = service_class_fetch($page_owner_uid, 'photo_upload_limit');
-
-	if ($limit) {
-		$r = q("SELECT SUM(OCTET_LENGTH(`data`)) AS `total` FROM `photo`
-			WHERE `uid` = %d AND `scale` = 0
-			AND `album` != 'Contact Photos' ",
-			intval($page_owner_uid)
-		);
-		$size = $r[0]['total'];
-
-		if (($size + strlen($imagedata)) > $limit) {
-			$msg = upgrade_message(true);
-			if ($r_json) {
-				echo json_encode(array('error'=>$msg));
-			} else {
-				echo  $msg. EOL;
-			}
-			@unlink($src);
-			killme();
-		}
+		exit();
 	}
 
 	$imagedata = @file_get_contents($src);
-	$ph = new Photo($imagedata, $filetype);
+	$Image = new Image($imagedata, $filetype);
 
-	if (! $ph->is_valid()) {
-		$msg = t('Unable to process image.');
+	if (!$Image->isValid()) {
+		$msg = L10n::t('Unable to process image.');
 		if ($r_json) {
-			echo json_encode(array('error'=>$msg));
+			echo json_encode(['error' => $msg]);
 		} else {
 			echo  $msg. EOL;
 		}
 		@unlink($src);
-		killme();
+		exit();
 	}
 
-	$ph->orient($src);
+	$Image->orient($src);
 	@unlink($src);
 
 	$max_length = Config::get('system', 'max_image_length');
-	if (! $max_length) {
+	if (!$max_length) {
 		$max_length = MAX_IMAGE_LENGTH;
 	}
 	if ($max_length > 0) {
-		$ph->scaleImage($max_length);
-		logger("File upload: Scaling picture to new size " . $max_length, LOGGER_DEBUG);
+		$Image->scaleDown($max_length);
+		Logger::log("File upload: Scaling picture to new size " . $max_length, Logger::DEBUG);
 	}
 
-	$width = $ph->getWidth();
-	$height = $ph->getHeight();
+	$width = $Image->getWidth();
+	$height = $Image->getHeight();
 
-	$hash = photo_new_resource();
+	$hash = Photo::newResource();
 
 	$smallest = 0;
 
 	// If we don't have an album name use the Wall Photos album
-	if (! strlen($album)) {
-		$album = t('Wall Photos');
+	if (!strlen($album)) {
+		$album = L10n::t('Wall Photos');
 	}
 
 	$defperm = '<' . $default_cid . '>';
 
-	$r = $ph->store($page_owner_uid, $visitor, $hash, $filename, $album, 0, 0, $defperm);
+	$r = Photo::store($Image, $page_owner_uid, $visitor, $hash, $filename, $album, 0, 0, $defperm);
 
-	if (! $r) {
-		$msg = t('Image upload failed.');
+	if (!$r) {
+		$msg = L10n::t('Image upload failed.');
 		if ($r_json) {
-			echo json_encode(array('error'=>$msg));
+			echo json_encode(['error' => $msg]);
 		} else {
 			echo  $msg. EOL;
 		}
-		killme();
+		exit();
 	}
 
 	if ($width > 640 || $height > 640) {
-		$ph->scaleImage(640);
-		$r = $ph->store($page_owner_uid, $visitor, $hash, $filename, $album, 1, 0, $defperm);
+		$Image->scaleDown(640);
+		$r = Photo::store($Image, $page_owner_uid, $visitor, $hash, $filename, $album, 1, 0, $defperm);
 		if ($r) {
 			$smallest = 1;
 		}
 	}
 
 	if ($width > 320 || $height > 320) {
-		$ph->scaleImage(320);
-		$r = $ph->store($page_owner_uid, $visitor, $hash, $filename, $album, 2, 0, $defperm);
+		$Image->scaleDown(320);
+		$r = Photo::store($Image, $page_owner_uid, $visitor, $hash, $filename, $album, 2, 0, $defperm);
 		if ($r && ($smallest == 0)) {
 			$smallest = 2;
 		}
 	}
-
-	$basename = basename($filename);
 
 	if (!$desktopmode) {
 		$r = q("SELECT `id`, `datasize`, `width`, `height`, `type` FROM `photo`
@@ -289,45 +281,38 @@ function wall_upload_post(App $a, $desktopmode = true) {
 		);
 		if (!$r) {
 			if ($r_json) {
-				echo json_encode(array('error'=>''));
-				killme();
+				echo json_encode(['error' => '']);
+				exit();
 			}
 			return false;
 		}
-		$picture = array();
+		$picture = [];
 
 		$picture["id"]        = $r[0]["id"];
 		$picture["size"]      = $r[0]["datasize"];
 		$picture["width"]     = $r[0]["width"];
 		$picture["height"]    = $r[0]["height"];
 		$picture["type"]      = $r[0]["type"];
-		$picture["albumpage"] = App::get_baseurl() . '/photos/' . $page_owner_nick . '/image/' . $hash;
-		$picture["picture"]   = App::get_baseurl() . "/photo/{$hash}-0." . $ph->getExt();
-		$picture["preview"]   = App::get_baseurl() . "/photo/{$hash}-{$smallest}." . $ph->getExt();
+		$picture["albumpage"] = System::baseUrl() . '/photos/' . $page_owner_nick . '/image/' . $hash;
+		$picture["picture"]   = System::baseUrl() . "/photo/{$hash}-0." . $Image->getExt();
+		$picture["preview"]   = System::baseUrl() . "/photo/{$hash}-{$smallest}." . $Image->getExt();
 
 		if ($r_json) {
-			echo json_encode(array('picture'=>$picture));
-			killme();
+			echo json_encode(['picture' => $picture]);
+			exit();
 		}
+		Logger::log("upload done", Logger::DEBUG);
 		return $picture;
 	}
 
+	Logger::log("upload done", Logger::DEBUG);
 
 	if ($r_json) {
-		echo json_encode(array('ok'=>true));
-		killme();
+		echo json_encode(['ok' => true]);
+		exit();
 	}
 
-/* mod Waitman Gobble NO WARRANTY */
-	// if we get the signal then return the image url info in BBCODE
-	if ($_REQUEST['hush']!='yeah') {
-		echo  "\n\n" . '[url=' . App::get_baseurl() . '/photos/' . $page_owner_nick . '/image/' . $hash . '][img]' . App::get_baseurl() . "/photo/{$hash}-{$smallest}.".$ph->getExt()."[/img][/url]\n\n";
-	} else {
-		$m = '[url='.App::get_baseurl().'/photos/'.$page_owner_nick.'/image/'.$hash.'][img]'.App::get_baseurl()."/photo/{$hash}-{$smallest}.".$ph->getExt()."[/img][/url]";
-		return($m);
-	}
-/* mod Waitman Gobble NO WARRANTY */
-
-	killme();
+	echo  "\n\n" . '[url=' . System::baseUrl() . '/photos/' . $page_owner_nick . '/image/' . $hash . '][img]' . System::baseUrl() . "/photo/{$hash}-{$smallest}.".$Image->getExt()."[/img][/url]\n\n";
+	exit();
 	// NOTREACHED
 }

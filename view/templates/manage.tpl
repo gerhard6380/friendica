@@ -1,6 +1,6 @@
 
 <h3>{{$title}}</h3>
-<div id="identity-manage-desc">{{$desc}}</div>
+<div id="identity-manage-desc">{{$desc nofilter}}</div>
 <div id="identity-manage-choose">{{$choose}}</div>
 
 <div id="identity-selector-wrapper" role="menu">
@@ -11,7 +11,7 @@
 			<div class="identity-match-photo" id="identity-match-photo-{{$id.uid}}">
 				<button name="identity" value="{{$id.uid}}" onclick="this.form.submit();" title="{{$id.username}}">
 					<img src="{{$id.thumb}}" alt="{{$id.username}}" />
-					{{if $id.notifications}}<span class="manage-notify">{{$id.notifications}}</span>{{/if}}
+					{{if $id.notifications}}<span class="manage-notify badge">{{$id.notifications}}</span>{{/if}}
 				</button>
 			</div>
 

@@ -1,7 +1,11 @@
 /* General style rules .*/
 .pull-right { float: right }
 
-/* General designing elements */
+details > summary {
+  cursor: pointer;
+}
+
+/* General design elements */
 .btn {
   outline: none;
   -moz-box-shadow: inset 0px 1px 0px 0px #ffffff;
@@ -28,7 +32,7 @@ a.btn, a.btn:hover {
 }
 
 .overline {
-	text-decoration: overline;
+  text-decoration: overline;
 }
 
 /* List of social Networks */
@@ -59,12 +63,18 @@ span.connector {
   padding-bottom: 5px;
   margin-top: 10px;
 }
-.type-link:after, .type-video:after {
-    content: ".";
-    display: block;
-    height: 0;
-    clear: both;
-    visibility: hidden;
+
+.type-link:after, .type-video:after,
+.oembed.video:after {
+  content: ".";
+  display: block;
+  height: 0;
+  clear: both;
+  visibility: hidden;
+}
+
+.type-video .oembed.video:after {
+  float: left;
 }
 
 .wall-item-container .wall-item-content .type-link img,
@@ -77,11 +87,19 @@ span.connector {
 
 .wall-item-container .wall-item-content .type-link img.attachment-image,
 .type-link img.attachment-image, .type-video img.attachment-image  {
-  /* max-width: 640px; */
   max-width: 100%;
   max-height: initial;
   float: initial;
   margin-right: 0px;
+}
+
+
+.wall-item-like-expanded,
+.wall-item-dislike-expanded,
+.wall-item-attendyes-expanded,
+.wall-item-attendno-expanded,
+.wall-item-attendmaybe-expanded {
+  margin: 0;
 }
 
 .type-link blockquote, .type-video blockquote {
@@ -93,6 +111,7 @@ span.connector {
   font-size: 13px;
   line-height: normal;
 }
+
 .type-link .oembed, .type-video .oembed {
   font-size: 18px;
   font-weight: 300;
@@ -121,6 +140,11 @@ span.connector {
   float: none;
 }
 
+.oembed.video .embed_video > div {
+  position: absolute;
+  top: 0px;
+  left: 0px;
+}
 .embed_rich {
   display: block;
   transition: height .75s;
@@ -167,8 +191,36 @@ blockquote.shared_content {
   border: none;
 }
 
+/* Events */
+.event-summary {
+  margin: 0px 0px 10px 0px;
+  font-weight: bold;
+}
+
+.vevent .event-summary {
+  margin: 0px 0px 10px 0px;
+}
+
+.vevent .event-description {
+  padding: 10px 0;
+}
+
+.event-label {
+  font-weight: bold;
+}
+
 .settings-heading a:after{
   content: ' »';
+}
+
+#profile-photo-wrapper {
+  clear: both;
+  overflow: hidden;
+}
+
+#newmember-tips {
+  margin-top: -3px;
+  font-size: 1.2em;
 }
 
 /* headers */
@@ -207,8 +259,14 @@ span.oembed, h4 {
   margin: 0px 0px 0px 0px;
 }
 
-code { display: block; background-color: #eee; color: #666; padding:1em; font-size: 0.8em; font-family: monospace; }
-key { display: inline; background-color: #eee; color: #666; padding:0.2em; font-size: 0.8em; font-family: monospace; }
+code, key {
+  display: inline;
+  background-color: #eee;
+  color: #666;
+  padding: 0.2em;
+  font-size: 0.85em;
+  font-family: monospace;
+}
 
 /* fields help text */
 .field .field_help {
@@ -369,14 +427,10 @@ a {
   color: #00a700;
 }
 .federation-graph {
-  width: 400px;
-  height: 400px;
+  margin: 0 auto;
   float: right;
-  margin: 20px;
 }
 .federation-network-graph {
-  width: 240px;
-  height: 240px;
   float: left;
   margin: 20px;
 }
@@ -410,6 +464,22 @@ td.federation-data {
 
 #forum-widget-collapse {
   opacity: 0.3;
+}
+
+/* help widget */
+aside .help-aside-wrapper ul {
+  padding-left: 1em;
+}
+
+aside .help-aside-wrapper h1 {
+  font-size:2em
+}
+
+.md_warning {
+  padding: 1em;
+  border: #ff0000 solid 2px;
+  background-color: #f9a3a3;
+  color: #ffffff;
 }
 
 #forum-widget-collapse:hover {
@@ -471,19 +541,20 @@ td.federation-data {
 
 /* admin pending user notes */
 td.pendingnote {
-	padding-left: 20px;
-	padding-right: 20px;
+  padding-left: 20px;
+  padding-right: 20px;
 }
 td.pendingnote > p > span {
-	font-weight: bold;
+  font-weight: bold;
 }
 
 /* warning message */
+.crepair-error-message,
 .warning-message {
-	padding: 10px;
-	margin: 5px;
-	border-left: 5px solid #f00;
-	font-weight: bold;
+  padding: 10px;
+  margin: 5px;
+  border-left: 5px solid #f00;
+  font-weight: bold;
 }
 
 /* src/href attributes filter error display */
@@ -492,3 +563,79 @@ td.pendingnote > p > span {
 .invalid-src:after,
 .invalid-href:after { content: '⚠️'}
 img.invalid-src:after { vertical-align: top;}
+
+/* Tag cloud */
+.tag1, .tag1:hover {
+  font-size: 0.9em ;
+  color: DarkGray;
+}
+.tag2, .tag2:hover {
+  font-size: 1.0em;
+  color: LawnGreen;
+}
+.tag3, .tag3:hover {
+  font-size: 1.1em;
+  color: DarkOrange;
+}
+.tag4, .tag4:hover {
+  font-size: 1.2em;
+  color: Red;
+}
+.tag5, .tag5:hover {
+  font-size: 1.3em;
+  color: Gold;
+}
+.tag6, .tag6:hover {
+  font-size: 1.4em;
+  color: Teal;
+}
+.tag7, .tag7:hover {
+  font-size: 1.5em;
+  color: DarkMagenta;
+}
+.tag8, .tag8:hover {
+  font-size: 1.6em;
+  color: DarkGoldenRod;
+}
+.tag9, .tag9:hover {
+  font-size: 1.7em;
+  color: DarkBlue;
+}
+.tag10 .tag10:hover {
+  font-size: 1.8em;
+  color: DeepPink;
+}
+.tags > a:hover {
+  text-decoration: underline;
+}
+.tag-cloud {
+  word-wrap: break-word;
+}
+
+#register-explicid-content {
+  font-weight: bold;
+}
+
+span.emoji.mastodon img {
+  height: 1.2em;
+  vertical-align: middle;
+}
+
+/* Exception page */
+
+#exception {
+  overflow: hidden;
+  background-image: url('../images/friendica-404_svg_hare-bottom-light-inside.png');
+  background-position: 50px bottom;
+  background-repeat: no-repeat;
+}
+
+#exception .hare {
+  float: right;
+}
+
+@media screen and (max-width: 600px) {
+  #exception .hare {
+    display: none;
+  }
+}

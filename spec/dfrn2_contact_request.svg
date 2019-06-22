@@ -31,14 +31,14 @@ text { font:12px Dialog; }
 <text x="904" y="854" style="font:13px Open Sans">----------------------------------------------</text>
 <text x="904" y="900" style="font:13px Open Sans">- Cleanup old introductions that remain blocked + Cleanup </text>
 <text x="904" y="923" style="font:13px Open Sans">any old email intros - which will have a greater lifetime</text>
-<text x="904" y="969" style="font:13px Open Sans">- probe_url Bobs posted dfrn_url and get the network with </text>
+<text x="904" y="969" style="font:13px Open Sans">- Probe::uri Bobs posted dfrn_url and get the network with </text>
 <text x="904" y="992" style="font:13px Open Sans">webfinger_dfrn</text>
 <text x="904" y="1038" style="font:13px Open Sans">- try to select all contact data of Bob (contact table) by the </text>
 <text x="904" y="1061" style="font:13px Open Sans">url ($_POST['dfrn_url] and profile uid ($a-&gt;profile['uid']) </text>
 <text x="904" y="1084" style="font:13px Open Sans">where self = 0 to look if this contact is already there (if </text>
 <text x="904" y="1107" style="font:13px Open Sans">issued-id or rel is already available return here because it </text>
 <text x="904" y="1130" style="font:13px Open Sans">seems that we are already connected)</text>
-<text x="904" y="1176" style="font:13px Open Sans">- create a issued-id with $issued_id = random_string();</text>
+<text x="904" y="1176" style="font:13px Open Sans">- create a issued-id with $issued_id = Strings::getRandomHex();</text>
 <text x="904" y="1222" style="font:13px Open Sans">- if we already found a contact record above update the </text>
 <text x="904" y="1245" style="font:13px Open Sans">issued-id with the one we have created</text>
 <text x="904" y="1291" style="font:13px Open Sans">- otherwise if Bob is not already in the contact table scrape </text>
@@ -80,7 +80,7 @@ text { font:12px Dialog; }
 <text x="149" y="1721" style="font:13px Open Sans">($_POST['localconfirm'] == 1)</text>
 <text x="149" y="1744" style="font:13px Open Sans">-----------------------------------------------------------------------</text>
 <text x="149" y="1767" style="font:13px Open Sans">- if(local_user() &amp;&amp; ($a-&gt;user['nickname'] == $a-</text>
-<text x="149" y="1790" style="font:13px Open Sans">&gt;argv[1]) &amp;&amp; (x($_POST,'dfrn_url')))</text>
+<text x="149" y="1790" style="font:13px Open Sans">&gt;argv[1]) &amp;&amp; !empty($_POST['dfrn_url']))</text>
 <text x="149" y="1813" style="font:13px Open Sans">-&gt;</text>
 <text x="149" y="1859" style="font:13px Open Sans">- $confirm_key comes from $_POST</text>
 <text x="149" y="1905" style="font:13px Open Sans">- get data for contact Karen (contact table) by </text>
@@ -93,9 +93,9 @@ text { font:12px Dialog; }
 <text x="149" y="2112" style="font:13px Open Sans">- create a contact for Karen in the contact table with </text>
 <text x="149" y="2135" style="font:13px Open Sans">the scraped data with blocked = 1 and pending = 1 </text>
 <text x="149" y="2158" style="font:13px Open Sans">(Karens pubkey becomes the contact site-pubkey)</text>
-<text x="149" y="2204" style="font:13px Open Sans">- fetch_url($dfrn_request . '?confirm_key=' . </text>
+<text x="149" y="2204" style="font:13px Open Sans">- Network::fetchUrl($dfrn_request . '?confirm_key=' . </text>
 <text x="149" y="2227" style="font:13px Open Sans">$confirm_key);</text>
-<text x="149" y="2273" style="font:13px Open Sans">- fetch_url(http://karenhomepage.com/dfrn_request?</text>
+<text x="149" y="2273" style="font:13px Open Sans">- Network::fetchUrl(http://karenhomepage.com/dfrn_request?</text>
 <text x="149" y="2296" style="font:13px Open Sans">confirm_key=”ABC123”)</text>
 <clipPath id="clip13"><path d="M1061,2027 L1238,2027 L1238,2069 L1061,2069 L1061,2027 Z" /></clipPath>
 <path d="M1070,2028 C1065.5820313,2028 1062,2031.5820313 1062,2036 L1062,2059 C1062,2063.4179688 1065.5820313,2067 1070,2067 L1228,2067 C1232.4179688,2067 1236,2063.4179688 1236,2059 L1236,2036 C1236,2031.5820313 1232.4179688,2028 1228,2028 Z" style="fill:rgb(127,127,127);stroke:none" clip-path="url(#clip13)" />
@@ -104,7 +104,7 @@ text { font:12px Dialog; }
 <path d="M866,2206 C861.5820313,2206 858,2209.5820313 858,2214 L858,2444 C858,2448.4179688 861.5820313,2452 866,2452 L1434,2452 C1438.4179688,2452 1442,2448.4179688 1442,2444 L1442,2214 C1442,2209.5820313 1438.4179688,2206 1434,2206 Z" style="fill:rgb(255,255,3);stroke:none" clip-path="url(#clip14)" />
 <text x="871" y="2228" style="font:13px Open Sans">http://karenhomepage.com/dfrn_request?confirm_key=”ABC123”</text>
 <text x="871" y="2274" style="font:13px Open Sans">dfrn_request_content() -</text>
-<text x="871" y="2297" style="font:13px Open Sans">(elseif((x($_GET,'confirm_key')) &amp;&amp; strlen($_GET['confirm_key'])) )</text>
+<text x="871" y="2297" style="font:13px Open Sans">elseif (!empty($_GET['confirm_key']))</text>
 <text x="871" y="2320" style="font:13px Open Sans">----------------------------------------------------------------------------------------------</text>
 <text x="871" y="2366" style="font:13px Open Sans">- select the intro by confirm_key (intro table) -&gt; get contact id</text>
 <text x="871" y="2389" style="font:13px Open Sans">- use the intro contact id to get the contact in the contact table</text>

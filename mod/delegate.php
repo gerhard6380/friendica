@@ -1,148 +1,191 @@
 <?php
-require_once('mod/settings.php');
+/**
+ * @file mod/delegate.php
+ */
 
-function delegate_init(App $a) {
-	return settings_init($a);
+use Friendica\App;
+use Friendica\BaseModule;
+use Friendica\Core\L10n;
+use Friendica\Core\Protocol;
+use Friendica\Core\Renderer;
+use Friendica\Core\System;
+use Friendica\Database\DBA;
+use Friendica\Model\User;
+use Friendica\Util\Strings;
+
+require_once 'mod/settings.php';
+
+function delegate_init(App $a)
+{
+	settings_init($a);
 }
 
+function delegate_post(App $a)
+{
+	if (!local_user()) {
+		return;
+	}
 
-function delegate_content(App $a) {
+	if (count($a->user) && !empty($a->user['uid']) && $a->user['uid'] != local_user()) {
+		notice(L10n::t('Permission denied.') . EOL);
+		return;
+	}
 
-	if (! local_user()) {
-		notice( t('Permission denied.') . EOL);
+	BaseModule::checkFormSecurityTokenRedirectOnError('/delegate', 'delegate');
+
+	$parent_uid = defaults($_POST, 'parent_user', 0);
+	$parent_password = defaults($_POST, 'parent_password', '');
+
+	if ($parent_uid != 0) {
+		$user = DBA::selectFirst('user', ['nickname'], ['uid' => $parent_uid]);
+		if (!DBA::isResult($user)) {
+			notice(L10n::t('Parent user not found.') . EOL);
+			return;
+		}
+
+		$success = User::authenticate($user['nickname'], trim($parent_password));
+		if (!$success) {
+			notice(L10n::t('Permission denied.') . EOL);
+			return;
+		}
+	}
+
+	DBA::update('user', ['parent-uid' => $parent_uid], ['uid' => local_user()]);
+}
+
+function delegate_content(App $a)
+{
+	if (!local_user()) {
+		notice(L10n::t('Permission denied.') . EOL);
 		return;
 	}
 
 	if ($a->argc > 2 && $a->argv[1] === 'add' && intval($a->argv[2])) {
-
 		// delegated admins can view but not change delegation permissions
-
-		if (x($_SESSION,'submanage') && intval($_SESSION['submanage'])) {
-			goaway(App::get_baseurl() . '/delegate');
+		if (!empty($_SESSION['submanage'])) {
+			$a->internalRedirect('delegate');
 		}
 
-		$id = $a->argv[2];
+		$user_id = $a->argv[2];
 
-		$r = q("select `nickname` from user where uid = %d limit 1",
-			intval($id)
-		);
-		if (dbm::is_result($r)) {
-			$r = q("select id from contact where uid = %d and nurl = '%s' limit 1",
-				intval(local_user()),
-				dbesc(normalise_link(App::get_baseurl() . '/profile/' . $r[0]['nickname']))
-			);
-			if (dbm::is_result($r)) {
-				q("insert into manage ( uid, mid ) values ( %d , %d ) ",
-					intval($a->argv[2]),
-					intval(local_user())
-				);
+		$user = DBA::selectFirst('user', ['nickname'], ['uid' => $user_id]);
+		if (DBA::isResult($user)) {
+			$condition = [
+				'uid' => local_user(),
+				'nurl' => Strings::normaliseLink(System::baseUrl() . '/profile/' . $user['nickname'])
+			];
+			if (DBA::exists('contact', $condition)) {
+				DBA::insert('manage', ['uid' => $user_id, 'mid' => local_user()]);
 			}
 		}
-		goaway(App::get_baseurl() . '/delegate');
+		$a->internalRedirect('delegate');
 	}
 
 	if ($a->argc > 2 && $a->argv[1] === 'remove' && intval($a->argv[2])) {
-
 		// delegated admins can view but not change delegation permissions
-		if (x($_SESSION,'submanage') && intval($_SESSION['submanage'])) {
-			goaway(App::get_baseurl() . '/delegate');
+		if (!empty($_SESSION['submanage'])) {
+			$a->internalRedirect('delegate');
 		}
 
-		q("DELETE FROM `manage` WHERE `uid` = %d AND `mid` = %d LIMIT 1",
-			intval($a->argv[2]),
-			intval(local_user())
-		);
-		goaway(App::get_baseurl() . '/delegate');
-
+		DBA::delete('manage', ['uid' => $a->argv[2], 'mid' => local_user()]);
+		$a->internalRedirect('delegate');
 	}
-
-	$full_managers = array();
-
-	// These people can manage this account/page with full privilege
-
-	$r = q("SELECT * FROM `user` WHERE `email` = '%s' AND `password` = '%s' ",
-		dbesc($a->user['email']),
-		dbesc($a->user['password'])
-	);
-	if (dbm::is_result($r))
-		$full_managers = $r;
-
-	$delegates = array();
 
 	// find everybody that currently has delegated management to this account/page
-
-	$r = q("select * from user where uid in ( select uid from manage where mid = %d ) ",
+	$delegates = [];
+	$r = q("SELECT * FROM `user` WHERE `uid` IN (SELECT `uid` FROM `manage` WHERE `mid` = %d)",
 		intval(local_user())
 	);
-
-	if (dbm::is_result($r))
+	if (DBA::isResult($r)) {
 		$delegates = $r;
-
-	$uids = array();
-
-	if(count($full_managers))
-		foreach($full_managers as $rr)
-			$uids[] = $rr['uid'];
-
-	if(count($delegates))
-		foreach($delegates as $rr)
-			$uids[] = $rr['uid'];
-
-	// find every contact who might be a candidate for delegation
-
-	$r = q("select nurl from contact where substring_index(contact.nurl,'/',3) = '%s'
-		and contact.uid = %d and contact.self = 0 and network = '%s' ",
-		dbesc(normalise_link(App::get_baseurl())),
-		intval(local_user()),
-		dbesc(NETWORK_DFRN)
-	);
-
-	if (! dbm::is_result($r)) {
-		notice( t('No potential page delegates located.') . EOL);
-		return;
 	}
 
-	$nicknames = array();
+	$uids = [];
+	foreach ($delegates as $rr) {
+		$uids[] = $rr['uid'];
+	}
 
-	if (dbm::is_result($r)) {
+	// find every contact who might be a candidate for delegation
+	$potentials = [];
+
+	$r = q("SELECT `nurl`
+		FROM `contact`
+		WHERE `self` = 0
+		AND SUBSTRING_INDEX(`nurl`, '/', 3) = '%s'
+		AND `uid` = %d
+		AND `network` = '%s' ",
+		DBA::escape(Strings::normaliseLink(System::baseUrl())),
+		intval(local_user()),
+		DBA::escape(Protocol::DFRN)
+	);
+	if (DBA::isResult($r)) {
+		$nicknames = [];
 		foreach ($r as $rr) {
-			$nicknames[] = "'" . dbesc(basename($rr['nurl'])) . "'";
+			$nicknames[] = "'" . DBA::escape(basename($rr['nurl'])) . "'";
+		}
+
+		$nicks = implode(',', $nicknames);
+
+		// get user records for all potential page delegates who are not already delegates or managers
+		$r = q("SELECT `uid`, `username`, `nickname` FROM `user` WHERE `nickname` IN ($nicks)");
+		if (DBA::isResult($r)) {
+			foreach ($r as $rr) {
+				if (!in_array($rr['uid'], $uids)) {
+					$potentials[] = $rr;
+				}
+			}
 		}
 	}
 
-	$potentials = array();
-
-	$nicks = implode(',',$nicknames);
-
-	// get user records for all potential page delegates who are not already delegates or managers
-
-	$r = q("select `uid`, `username`, `nickname` from user where nickname in ( $nicks )");
-
-	if (dbm::is_result($r))
-		foreach($r as $rr)
-			if(! in_array($rr['uid'],$uids))
-				$potentials[] = $rr;
-
-	require_once("mod/settings.php");
 	settings_init($a);
 
-	$o = replace_macros(get_markup_template('delegate.tpl'),array(
-		'$header' => t('Delegate Page Management'),
-		'$base' => App::get_baseurl(),
-		'$desc' => t('Delegates are able to manage all aspects of this account/page except for basic account settings. Please do not delegate your personal account to anybody that you do not trust completely.'),
-		'$head_managers' => t('Existing Page Managers'),
-		'$managers' => $full_managers,
-		'$head_delegates' => t('Existing Page Delegates'),
+	$user = DBA::selectFirst('user', ['parent-uid', 'email'], ['uid' => local_user()]);
+
+	$parent_user = null;
+
+	if (DBA::isResult($user)) {
+		if (!DBA::exists('user', ['parent-uid' => local_user()])) {
+			$parent_uid = $user['parent-uid'];
+			$parents = [0 => L10n::t('No parent user')];
+
+			$fields = ['uid', 'username', 'nickname'];
+			$condition = ['email' => $user['email'], 'verified' => true, 'blocked' => false, 'parent-uid' => 0];
+			$parent_users = DBA::select('user', $fields, $condition);
+			while ($parent = DBA::fetch($parent_users)) {
+				if ($parent['uid'] != local_user()) {
+					$parents[$parent['uid']] = sprintf('%s (%s)', $parent['username'], $parent['nickname']);
+				}
+			}
+			$parent_user = ['parent_user', '', $parent_uid, '', $parents];
+		}
+	}
+
+	if (!is_null($parent_user)) {
+		$parent_password = ['parent_password', L10n::t('Parent Password:'), '', L10n::t('Please enter the password of the parent account to legitimize your request.')];
+	} else {
+		$parent_password = '';
+	}
+
+	$o = Renderer::replaceMacros(Renderer::getMarkupTemplate('delegate.tpl'), [
+		'$form_security_token' => BaseModule::getFormSecurityToken('delegate'),
+		'$parent_header' => L10n::t('Parent User'),
+		'$parent_user' => $parent_user,
+		'$parent_password' => $parent_password,
+		'$parent_desc' => L10n::t('Parent users have total control about this account, including the account settings. Please double check whom you give this access.'),
+		'$submit' => L10n::t('Save Settings'),
+		'$header' => L10n::t('Delegate Page Management'),
+		'$delegates_header' => L10n::t('Delegates'),
+		'$base' => System::baseUrl(),
+		'$desc' => L10n::t('Delegates are able to manage all aspects of this account/page except for basic account settings. Please do not delegate your personal account to anybody that you do not trust completely.'),
+		'$head_delegates' => L10n::t('Existing Page Delegates'),
 		'$delegates' => $delegates,
-		'$head_potentials' => t('Potential Delegates'),
+		'$head_potentials' => L10n::t('Potential Delegates'),
 		'$potentials' => $potentials,
-		'$remove' => t('Remove'),
-		'$add' => t('Add'),
-		'$none' => t('No entries.')
-	));
+		'$remove' => L10n::t('Remove'),
+		'$add' => L10n::t('Add'),
+		'$none' => L10n::t('No entries.')
+	]);
 
 
 	return $o;
-
-
 }

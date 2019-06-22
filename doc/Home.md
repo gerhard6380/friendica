@@ -27,38 +27,50 @@ Friendica Documentation and Resources
 **Admin Manual**
 
 * [Install](help/Install)
+* [Update](help/Update)
 * [Settings & Admin Panel](help/Settings)
 * [Installing Connectors (Twitter/GNU Social)](help/Installing-Connectors)
 * [Install an ejabberd server (XMPP chat) with synchronized credentials](help/install-ejabberd)
 * [Using SSL with Friendica](help/SSL)
-* [Config values that can only be set in .htconfig.php](help/htconfig)
+* [Config values that can only be set in config/local.config.php](help/Config)
 * [Improve Performance](help/Improve-Performance)
+* [Administration Tools](help/tools)
 
 **Developer Manual**
 
-* [Where to get started?](help/Developers-Intro)
-* [Help on Github](help/Github)
-* [Help on Vagrant](help/Vagrant)
-* [How to translate Friendica](help/translations)
-* [Bugs and Issues](help/Bugs-and-Issues)
-* [Plugin Development](help/Plugins)
-* [Theme Development](help/themes)
-* [Smarty 3 Templates](help/smarty3-templates)
-* [Protocol Documentation](help/Protocol)
-* [Database schema documantation](help/database)
-* [Class Autoloading](help/autoloader)
-* [Using Composer](help/Composer)
-* [Code - Reference(Doxygen generated - sets cookies)](doc/html/)
-* [Twitter/GNU Social API Functions](help/api)
-
+* [Get started](help/Developers-Intro)
+* Set up development environment
+	* [Help on Github](help/Github)
+	* [Help on Vagrant](help/Vagrant)
+	* [Bugs and Issues](help/Bugs-and-Issues)
+* Code structure
+	* [Addon Development](help/Addons)
+	* [Theme Development](help/themes)
+	* [Smarty 3 Templates](help/smarty3-templates)
+	* [Storage backend addon](help/AddonStorageBackend)
+* How To
+	* [Translate Friendica](help/translations)
+	* [Use Composer](help/Composer)
+	* [Move classes to `src`](help/Developer-How-To-Move-Classes-to-src)
+	* [Run tests](help/Tests)
+* Reference
+	* [Twitter/GNU Social API Functions](help/api)
+	* [Code (Doxygen generated - sets cookies)](doc/html/)
+	* [Protocol Documentation](help/Protocol)
+	* [Database schema documentation](help/database)
+	* [Class Autoloading](help/autoloader)
 
 **External Resources**
 
-* [Main Website](http://friendica.com)
-* [Mailing List Archive](http://librelist.com/browser/friendica/)
+* [Main Website](https://friendi.ca)
+* Ways to get Support
+  * [Friendica Support Forum](https://forum.friendi.ca/~helpers)
+  * [Mailing List Archive](http://mailman.friendi.ca/mailman/listinfo/support-friendi.ca) you can subscribe to the list by sending an email to ``support-request(at)friendi.ca?subject=subscribe``
+  * XMPP/Jabber MUC: support(at)forum.friendi.ca
+  * IRC: #friendica at irc.freenode.net
+  * Matrix: #friendi.ca or #friendica at matrix.org
 
 **About**
 
 * [Site/Version Info](friendica)
 * [Friendica Credits](credits)
-

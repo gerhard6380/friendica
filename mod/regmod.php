@@ -1,137 +1,109 @@
 <?php
+/**
+ * @file mod/regmod.php
+ */
 
-require_once('include/enotify.php');
-require_once('include/user.php');
+use Friendica\App;
+use Friendica\Core\Config;
+use Friendica\Core\L10n;
+use Friendica\Core\System;
+use Friendica\Core\Worker;
+use Friendica\Database\DBA;
+use Friendica\Model\Register;
+use Friendica\Model\User;
+use Friendica\Module\Login;
 
-function user_allow($hash) {
+function user_allow($hash)
+{
+	$a = \get_app();
 
-	$a = get_app();
-
-	$register = q("SELECT * FROM `register` WHERE `hash` = '%s' LIMIT 1",
-		dbesc($hash)
-	);
-
-
-	if (! dbm::is_result($register)) {
+	$register = Register::getByHash($hash);
+	if (!DBA::isResult($register)) {
 		return false;
 	}
 
-	$user = q("SELECT * FROM `user` WHERE `uid` = %d LIMIT 1",
-		intval($register[0]['uid'])
-	);
-
-	if (! dbm::is_result($user)) {
-		killme();
+	$user = User::getById($register['uid']);
+	if (!DBA::isResult($user)) {
+		exit();
 	}
 
-	$r = q("DELETE FROM `register` WHERE `hash` = '%s'",
-		dbesc($register[0]['hash'])
-	);
+	Register::deleteByHash($hash);
 
+	DBA::update('user', ['blocked' => false, 'verified' => true], ['uid' => $register['uid']]);
 
-	$r = q("UPDATE `user` SET `blocked` = 0, `verified` = 1 WHERE `uid` = %d",
-		intval($register[0]['uid'])
-	);
+	$profile = DBA::selectFirst('profile', ['net-publish'], ['uid' => $register['uid'], 'is-default' => true]);
 
-	$r = q("SELECT * FROM `profile` WHERE `uid` = %d AND `is-default` = 1",
-		intval($user[0]['uid'])
-	);
-	if (dbm::is_result($r) && $r[0]['net-publish']) {
-		$url = App::get_baseurl() . '/profile/' . $user[0]['nickname'];
-		if ($url && strlen(get_config('system','directory'))) {
-			proc_run(PRIORITY_LOW, "include/directory.php", $url);
-		}
+	if (DBA::isResult($profile) && $profile['net-publish'] && Config::get('system', 'directory')) {
+		$url = System::baseUrl() . '/profile/' . $user['nickname'];
+		Worker::add(PRIORITY_LOW, "Directory", $url);
 	}
 
-	push_lang($register[0]['language']);
+	L10n::pushLang($register['language']);
 
-	send_register_open_eml(
-		$user[0]['email'],
-		$a->config['sitename'],
-		App::get_baseurl(),
-		$user[0]['username'],
-		$register[0]['password']);
+	$res = User::sendRegisterOpenEmail(
+		$user,
+		Config::get('config', 'sitename'),
+		$a->getBaseUrl(),
+		defaults($register, 'password', 'Sent in a previous email')
+	);
 
-	pop_lang();
+	L10n::popLang();
 
-	if($res) {
-		info( t('Account approved.') . EOL );
+	if ($res) {
+		info(L10n::t('Account approved.') . EOL);
 		return true;
 	}
-
 }
-
 
 // This does not have to go through user_remove() and save the nickname
 // permanently against re-registration, as the person was not yet
 // allowed to have friends on this system
-
-function user_deny($hash) {
-
-	$register = q("SELECT * FROM `register` WHERE `hash` = '%s' LIMIT 1",
-		dbesc($hash)
-	);
-
-	if(! dbm::is_result($register))
+function user_deny($hash)
+{
+	$register = Register::getByHash($hash);
+	if (!DBA::isResult($register)) {
 		return false;
-
-	$user = q("SELECT * FROM `user` WHERE `uid` = %d LIMIT 1",
-		intval($register[0]['uid'])
-	);
-
-	$r = q("DELETE FROM `user` WHERE `uid` = %d",
-		intval($register[0]['uid'])
-	);
-	$r = q("DELETE FROM `contact` WHERE `uid` = %d",
-		intval($register[0]['uid'])
-	);
-	$r = q("DELETE FROM `profile` WHERE `uid` = %d",
-		intval($register[0]['uid'])
-	);
-
-	$r = q("DELETE FROM `register` WHERE `hash` = '%s'",
-		dbesc($register[0]['hash'])
-	);
-	notice( sprintf(t('Registration revoked for %s'), $user[0]['username']) . EOL);
-	return true;
-
-}
-
-function regmod_content(App $a) {
-
-	global $lang;
-
-	$_SESSION['return_url'] = $a->cmd;
-
-	if (! local_user()) {
-		info( t('Please login.') . EOL);
-		$o .= '<br /><br />' . login(($a->config['register_policy'] == REGISTER_CLOSED) ? 0 : 1);
-		return $o;
 	}
 
-	if ((!is_site_admin()) || (x($_SESSION,'submanage') && intval($_SESSION['submanage']))) {
-		notice( t('Permission denied.') . EOL);
+	$user = User::getById($register['uid']);
+	if (!DBA::isResult($user)) {
+		exit();
+	}
+
+	DBA::delete('user', ['uid' => $register['uid']]);
+
+	Register::deleteByHash($register['hash']);
+
+	notice(L10n::t('Registration revoked for %s', $user['username']) . EOL);
+	return true;
+}
+
+function regmod_content(App $a)
+{
+	if (!local_user()) {
+		info(L10n::t('Please login.') . EOL);
+		return Login::form($a->query_string, intval(Config::get('config', 'register_policy')) === \Friendica\Module\Register::CLOSED ? 0 : 1);
+	}
+
+	if (!is_site_admin() || !empty($_SESSION['submanage'])) {
+		notice(L10n::t('Permission denied.') . EOL);
 		return '';
 	}
 
 	if ($a->argc != 3) {
-		killme();
+		exit();
 	}
 
-	$cmd  = $a->argv[1];
+	$cmd = $a->argv[1];
 	$hash = $a->argv[2];
-
-
 
 	if ($cmd === 'deny') {
 		user_deny($hash);
-		goaway(App::get_baseurl()."/admin/users/");
-		killme();
+		$a->internalRedirect('admin/users/');
 	}
 
 	if ($cmd === 'allow') {
 		user_allow($hash);
-		goaway(App::get_baseurl()."/admin/users/");
-		killme();
+		$a->internalRedirect('admin/users/');
 	}
 }

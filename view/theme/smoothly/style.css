@@ -20,7 +20,7 @@ Orange - #fec01d
 /* For general iPad layouts */
 #body {
 	-moz-background-clip: border;
-	-moz-background-origin: pdading;
+	-moz-background-origin: padding;
 	-moz-background-size: auto auto;
 	background-attachment: scroll;
 	background-color: transparent;
@@ -962,10 +962,9 @@ li.widget-list {
 	top: 1px;
 }
 
-.group-selected,
-.nets-selected,
-.fileas-selected,
-.categories-selected {
+
+.widget .selected,
+.group-selected {
 	padding-bottom: 0px;
 	padding-left: 2px;
 	padding-right: 2px;
@@ -1006,13 +1005,13 @@ ul .sidebar-group-li .icon {
 	width: 12px;
 }
 
-.nets-ul, .fileas-ul, .categories-ul, .datebrowse-ul  {
+.nets-ul, .fileas-ul, .category-ul, .datebrowse-ul  {
 	list-style-type: none;
 }
 
 .nets-ul li,
 .fileas-ul li,
-.categories-ul li,
+.category-ul li,
 .datebrowse-link {
 }
 
@@ -1029,12 +1028,12 @@ ul .sidebar-group-li .icon {
 }
 
 .fileas-link,
-.categories-link {
+.category-link {
 	margin-left: 0px;
 }
 
 .fileas-all,
-.categories-all {
+.category-all {
 	margin-left: 0px;
 }
 
@@ -1860,7 +1859,7 @@ blockquote.shared_content {
 
 #item-delete-selected-icon {}
 
-code {
+pre code {
 	font-family: Courier, monospace;
 	display: block;
 	overflow: auto;
@@ -2024,7 +2023,7 @@ code {
 	float: right;
 }
 
-.wall-item-body code {
+.wall-item-body pre code {
 	font-family: Courier, monospace;
 	display: block;
 	overflow: auto;
@@ -3057,7 +3056,8 @@ margin-left: 0px;
 #side-invite-link,
 #side-random-profile-link,
 #side-suggest-link,
-#side-match-link {
+#side-match-link,
+#side-directory-link {
 	width: 80%;
 	padding: 10px;
 	margin: auto;
@@ -3079,7 +3079,8 @@ margin-left: 0px;
 #side-invite-link:hover,
 #side-random-profile-link:hover,
 #side-suggest-link:hover,
-#side-match-link:hover {
+#side-match-link:hover,
+#side-directory-link:hover {
 	color: #efefef;
 	background: -webkit-gradient( linear, left top, left bottom, color-stop(0.05, #1873a2), color-stop(1, #6da6c4) );
 	background: -moz-linear-gradient( center top, #1873a2 5%, #6da6c4 100% );
@@ -3098,7 +3099,8 @@ margin-left: 0px;
 #side-invite-link:active,
 #side-random-profile-link:active,
 #side-suggest-link:active,
-#side-match-link:active {
+#side-match-link:active,
+#side-directory-link:active {
 	background-color: #1873a2;
 	position: relative;
 	top: 1px;
@@ -3107,7 +3109,8 @@ margin-left: 0px;
 #side-invite-link a,
 #side-random-profile-link a,
 #side-suggest-link a,
-#side-match-link a {
+#side-match-link a,
+#side-directory-link a {
 	color: #efefef;
 }
 
@@ -3820,12 +3823,12 @@ margin-left: 0px;
 }
 
 #adminpage
-#pluginslist {
+#addonslist {
 	margin: 0px;
 	padding: 0px;
 }
 
-#adminpage .plugin {
+#adminpage .addon {
 	list-style: none;
 	display: block;
 	clear: left;
@@ -3840,7 +3843,7 @@ margin-left: 0px;
 	margin:10px 10px 10px 0;
 }
 
-#adminpage .toggleplugin {
+#adminpage .toggleaddon {
 	float: left;
 	margin-right: 1em;
 }
@@ -4623,7 +4626,7 @@ hr.line-dots {
 
 #birthday-notice {}
 #nav-notifications-template {}
-#categories-sidebar {}
+#category-sidebar {}
 #nets-desc {}
 #status-tab {}
 #page-footer {}
@@ -4673,9 +4676,6 @@ div #datebrowse-sidebar.widget {
 	width: 75px;
 }
 
-#id_post_newfriend,
-#id_post_joingroup,
-#id_post_profilechange,
 #id_notify1,
 #id_notify2,
 #id_notify3,

@@ -1,93 +1,93 @@
 <?php
-
-require_once('include/security.php');
-require_once('include/bbcode.php');
-require_once('include/items.php');
-
+/**
+ * @file mod/subthread.php
+ */
+use Friendica\App;
+use Friendica\Core\Hook;
+use Friendica\Core\L10n;
+use Friendica\Core\Logger;
+use Friendica\Core\System;
+use Friendica\Database\DBA;
+use Friendica\Model\Item;
+use Friendica\Util\Security;
+use Friendica\Util\Strings;
+use Friendica\Util\XML;
 
 function subthread_content(App $a) {
 
-	if(! local_user() && ! remote_user()) {
+	if (!local_user() && !remote_user()) {
 		return;
 	}
 
 	$activity = ACTIVITY_FOLLOW;
 
-	$item_id = (($a->argc > 1) ? notags(trim($a->argv[1])) : 0);
+	$item_id = (($a->argc > 1) ? Strings::escapeTags(trim($a->argv[1])) : 0);
 
-	$r = q("SELECT * FROM `item` WHERE `parent` = '%s' OR `parent-uri` = '%s' and parent = id LIMIT 1",
-		dbesc($item_id),
-		dbesc($item_id)
-	);
+	$condition = ["`parent` = ? OR `parent-uri` = ? AND `parent` = `id`", $item_id, $item_id];
+	$item = Item::selectFirst([], $condition);
 
-	if(! $item_id || (! dbm::is_result($r))) {
-		logger('subthread: no item ' . $item_id);
+	if (empty($item_id) || !DBA::isResult($item)) {
+		Logger::log('subthread: no item ' . $item_id);
 		return;
 	}
 
-	$item = $r[0];
-
 	$owner_uid = $item['uid'];
 
-	if(! can_write_wall($a,$owner_uid)) {
+	if (!Security::canWriteToUserWall($owner_uid)) {
 		return;
 	}
 
 	$remote_owner = null;
 
-	if(! $item['wall']) {
+	if (!$item['wall']) {
 		// The top level post may have been written by somebody on another system
-		$r = q("SELECT * FROM `contact` WHERE `id` = %d AND `uid` = %d LIMIT 1",
-			intval($item['contact-id']),
-			intval($item['uid'])
-		);
-		if (! dbm::is_result($r)) {
+		$contact = DBA::selectFirst('contact', [], ['id' => $item['contact-id'], 'uid' => $item['uid']]);
+		if (!DBA::isResult($contact)) {
 			return;
 		}
-		if (! $r[0]['self']) {
-			$remote_owner = $r[0];
+		if (!$contact['self']) {
+			$remote_owner = $contact;
 		}
 	}
 
+	$owner = null;
 	// this represents the post owner on this system.
 
 	$r = q("SELECT `contact`.*, `user`.`nickname` FROM `contact` LEFT JOIN `user` ON `contact`.`uid` = `user`.`uid`
 		WHERE `contact`.`self` = 1 AND `contact`.`uid` = %d LIMIT 1",
 		intval($owner_uid)
 	);
-	if (dbm::is_result($r))
-		$owner = $r[0];
 
-	if (! $owner) {
-		logger('like: no owner');
+	if (DBA::isResult($r)) {
+		$owner = $r[0];
+	}
+
+	if (!$owner) {
+		Logger::log('like: no owner');
 		return;
 	}
 
-	if (! $remote_owner)
+	if (!$remote_owner) {
 		$remote_owner = $owner;
+	}
 
-
+	$contact = null;
 	// This represents the person posting
 
-	if ((local_user()) && (local_user() == $owner_uid)) {
+	if (local_user() && (local_user() == $owner_uid)) {
 		$contact = $owner;
 	} else {
-		$r = q("SELECT * FROM `contact` WHERE `id` = %d AND `uid` = %d LIMIT 1",
-			intval($_SESSION['visitor_id']),
-			intval($owner_uid)
-		);
-		if (dbm::is_result($r))
-			$contact = $r[0];
-	}
-	if (! $contact) {
-		return;
+		$contact = DBA::selectFirst('contact', [], ['id' => $_SESSION['visitor_id'], 'uid' => $owner_uid]);
+		if (!DBA::isResult($contact)) {
+			return;
+		}
 	}
 
-	$uri = item_new_uri($a->get_hostname(),$owner_uid);
+	$uri = Item::newURI($owner_uid);
 
-	$post_type = (($item['resource-id']) ? t('photo') : t('status'));
+	$post_type = (($item['resource-id']) ? L10n::t('photo') : L10n::t('status'));
 	$objtype = (($item['resource-id']) ? ACTIVITY_OBJ_IMAGE : ACTIVITY_OBJ_NOTE );
-	$link = xmlify('<link rel="alternate" type="text/html" href="' . App::get_baseurl() . '/display/' . $owner['nickname'] . '/' . $item['id'] . '" />' . "\n") ;
+	$link = XML::escape('<link rel="alternate" type="text/html" href="' . System::baseUrl() . '/display/' . $item['guid'] . '" />' . "\n");
 	$body = $item['body'];
 
 	$obj = <<< EOT
@@ -101,22 +101,21 @@ function subthread_content(App $a) {
 		<content>$body</content>
 	</object>
 EOT;
-	$bodyverb = t('%1$s is following %2$s\'s %3$s');
+	$bodyverb = L10n::t('%1$s is following %2$s\'s %3$s');
 
-	if (! isset($bodyverb)) {
+	if (!isset($bodyverb)) {
 		return;
 	}
 
-	$arr = array();
+	$arr = [];
 
-	$arr['guid'] = get_guid(32);
+	$arr['guid'] = System::createUUID();
 	$arr['uri'] = $uri;
 	$arr['uid'] = $owner_uid;
 	$arr['contact-id'] = $contact['id'];
-	$arr['type'] = 'activity';
 	$arr['wall'] = $item['wall'];
 	$arr['origin'] = 1;
-	$arr['gravity'] = GRAVITY_LIKE;
+	$arr['gravity'] = GRAVITY_ACTIVITY;
 	$arr['parent'] = $item['id'];
 	$arr['parent-uri'] = $item['uri'];
 	$arr['thr-parent'] = $item['uri'];
@@ -129,7 +128,7 @@ EOT;
 
 	$ulink = '[url=' . $contact['url'] . ']' . $contact['name'] . '[/url]';
 	$alink = '[url=' . $item['author-link'] . ']' . $item['author-name'] . '[/url]';
-	$plink = '[url=' . App::get_baseurl() . '/display/' . $owner['nickname'] . '/' . $item['id'] . ']' . $post_type . '[/url]';
+	$plink = '[url=' . System::baseUrl() . '/display/' . $item['guid'] . ']' . $post_type . '[/url]';
 	$arr['body'] =  sprintf( $bodyverb, $ulink, $alink, $plink );
 
 	$arr['verb'] = $activity;
@@ -141,23 +140,17 @@ EOT;
 	$arr['deny_gid'] = $item['deny_gid'];
 	$arr['visible'] = 1;
 	$arr['unseen'] = 1;
-	$arr['last-child'] = 0;
 
-	$post_id = item_store($arr);
+	$post_id = Item::insert($arr);
 
-	if (! $item['visible']) {
-		$r = q("UPDATE `item` SET `visible` = 1 WHERE `id` = %d AND `uid` = %d",
-			intval($item['id']),
-			intval($owner_uid)
-		);
+	if (!$item['visible']) {
+		Item::update(['visible' => true], ['id' => $item['id']]);
 	}
 
 	$arr['id'] = $post_id;
 
-	call_hooks('post_local_end', $arr);
+	Hook::callAll('post_local_end', $arr);
 
-	killme();
+	exit();
 
 }
-
-
