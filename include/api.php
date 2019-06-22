@@ -2488,6 +2488,7 @@ function api_convert_item($item)
 	return [
 		"text" => $statustext,
 		"html" => $statushtml,
+		"renderedhtml" => $item['rendered_html'],
 		"attachments" => $attachments,
 		"entities" => $entities
 	];
@@ -2961,6 +2962,7 @@ function api_format_item($item, $type = "json", $status_user = null, $author_use
 		'friendica_private' => $item['private'] == 1,
 		//'entities' => NULL,
 		'statusnet_html' => $converted["html"],
+		'rendered_html' => $converted["renderedhtml"],
 		'statusnet_conversation_id' => $item['parent'],
 		'external_url' => System::baseUrl() . "/display/" . $item['guid'],
 		'friendica_activities' => api_format_items_activities($item, $type),
@@ -3011,6 +3013,7 @@ function api_format_item($item, $type = "json", $status_user = null, $author_use
 		unset($quoted_status['statusnet_conversation_id']);
 		$quoted_status['text'] = $conv_quoted['text'];
 		$quoted_status['statusnet_html'] = $conv_quoted['html'];
+		$quoted_status['rendered_html'] = $conv_quoted['renderedhtml'];
 		try {
 			$quoted_status["user"] = api_get_user($a, $quoted_item["author-id"]);
 		} catch (BadRequestException $e) {
@@ -3040,6 +3043,7 @@ function api_format_item($item, $type = "json", $status_user = null, $author_use
 
 		$retweeted_status['text'] = $rt_converted["text"];
 		$retweeted_status['statusnet_html'] = $rt_converted["html"];
+		$retweeted_status['rendered_html'] = $rt_converted['renderedhtml'];
 		$retweeted_status['created_at'] =  api_date($retweeted_item['created']);
 
 		if (!empty($quoted_status)) {
@@ -3053,6 +3057,7 @@ function api_format_item($item, $type = "json", $status_user = null, $author_use
 
 		$status['text'] = $root_status["text"];
 		$status['statusnet_html'] = $root_status["html"];
+		$status['rendered_html'] = $root_status["renderedhtml"];
 		$status['quoted_status'] = $quoted_status;
 	}
 
