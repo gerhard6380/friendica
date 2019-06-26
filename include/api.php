@@ -2449,7 +2449,8 @@ function api_convert_item($item)
 	}
 
 	$statushtml = BBCode::convert(api_clean_attachments($body), false);
-
+	$renderedhtml = $item['rendered-html'];
+	
 	// Workaround for clients with limited HTML parser functionality
 	$search = ["<br>", "<blockquote>", "</blockquote>",
 			"<h1>", "</h1>", "<h2>", "</h2>",
@@ -2463,6 +2464,7 @@ function api_convert_item($item)
 
 	if ($item['title'] != "") {
 		$statushtml = "<br><h4>" . BBCode::convert($item['title']) . "</h4><br>" . $statushtml;
+		$renderedhtml = "<h4>" . BBCode::convert($item['title']) . "</h4>" . $renderedhtml;
 	}
 
 	do {
@@ -2488,7 +2490,7 @@ function api_convert_item($item)
 	return [
 		"text" => $statustext,
 		"html" => $statushtml,
-		"renderedhtml" => $item['rendered_html'],
+		"renderedhtml" => $renderedhtml,
 		"attachments" => $attachments,
 		"entities" => $entities
 	];
