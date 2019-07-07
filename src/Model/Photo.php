@@ -16,6 +16,7 @@ use Friendica\Database\DBA;
 use Friendica\Database\DBStructure;
 use Friendica\Model\Storage\IStorage;
 use Friendica\Object\Image;
+use Friendica\Protocol\DFRN;
 use Friendica\Util\DateTimeFormat;
 use Friendica\Util\Network;
 use Friendica\Util\Security;
@@ -129,12 +130,23 @@ class Photo extends BaseObject
 	 */
 	public static function getPhoto($resourceid, $scale = 0)
 	{
-		$r = self::selectFirst(["uid"], ["resource-id" => $resourceid]);
+		$r = self::selectFirst(["uid", "allow_cid", "allow_gid", "deny_cid", "deny_gid"], ["resource-id" => $resourceid]);
 		if ($r === false) {
 			return false;
 		}
+		$uid = $r["uid"];
 
-		$sql_acl = Security::getPermissionsSQLByUserId($r["uid"]);
+		// This is the first place, when retrieving just a photo, that we know who owns the photo.
+		// Check if the photo is public (empty allow and deny means public), if so, skip auth attempt, if not
+		// make sure that the requester's session is appropriately authenticated to that user
+		// otherwise permissions checks done by getPermissionsSQLByUserId() won't work correctly
+		if (!empty($r["allow_cid"]) || !empty($r["allow_gid"]) || !empty($r["deny_cid"]) || !empty($r["deny_gid"])) {
+			$r = DBA::selectFirst("user", ["nickname"], ["uid" => $uid], []);
+			// this will either just return (if auth all ok) or will redirect and exit (starting over)
+			DFRN::autoRedir(self::getApp(), $r["nickname"]);
+		}
+
+		$sql_acl = Security::getPermissionsSQLByUserId($uid);
 
 		$conditions = [
 			"`resource-id` = ? AND `scale` <= ? " . $sql_acl,
@@ -413,13 +425,22 @@ class Photo extends BaseObject
 		$photo_failure = false;
 
 		$filename = basename($image_url);
-		$img_str = Network::fetchUrl($image_url, true);
+		if (!empty($image_url)) {
+			$ret = Network::curl($image_url, true);
+			$img_str = $ret->getBody();
+			$type = $ret->getContentType();
+		} else {
+			$img_str = '';
+		}
 
 		if ($quit_on_error && ($img_str == "")) {
 			return false;
 		}
 
-		$type = Image::guessType($image_url, true);
+		if (empty($type)) {
+			$type = Image::guessType($image_url, true);
+		}
+
 		$Image = new Image($img_str, $type);
 		if ($Image->isValid()) {
 			$Image->scaleToSquare(300);

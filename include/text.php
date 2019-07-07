@@ -8,10 +8,8 @@ use Friendica\Content\Smilies;
 use Friendica\Content\Text\BBCode;
 use Friendica\Core\Protocol;
 use Friendica\Model\Contact;
-
 use Friendica\Model\FileTag;
 use Friendica\Util\Strings;
-use Friendica\Util\XML;
 
 /**
  * Turn user/group ACLs stored as angle bracketed text into arrays
@@ -142,16 +140,12 @@ function redir_private_images($a, &$item)
  * @brief Given a text string, convert from bbcode to html and add smilie icons.
  *
  * @param string $text String with bbcode.
- * @return string Formattet HTML.
+ * @return string Formatted HTML
  * @throws \Friendica\Network\HTTPException\InternalServerErrorException
  */
-function prepare_text($text) {
-	if (stristr($text, '[nosmile]')) {
-		$s = BBCode::convert($text);
-	} else {
-		$s = Smilies::replace(BBCode::convert($text));
-	}
-
+function prepare_text($text)
+{
+	$s = BBCode::convert($text);
 	return trim($s);
 }
 
@@ -186,21 +180,17 @@ function get_cats_and_terms($item)
 {
 	$categories = [];
 	$folders = [];
-
-	$matches = [];
 	$first = true;
-	$cnt = preg_match_all('/<(.*?)>/', $item['file'], $matches, PREG_SET_ORDER);
-	if ($cnt) {
-		foreach ($matches as $mtch) {
-			$categories[] = [
-				'name' => XML::escape(FileTag::decode($mtch[1])),
-				'url' =>  "#",
-				'removeurl' => ((local_user() == $item['uid'])?'filerm/' . $item['id'] . '?f=&cat=' . XML::escape(FileTag::decode($mtch[1])):""),
-				'first' => $first,
-				'last' => false
-			];
-			$first = false;
-		}
+
+	foreach (FileTag::fileToArray($item['file'] ?? '', 'category') as $savedFolderName) {
+		$categories[] = [
+			'name' => $savedFolderName,
+			'url' => "#",
+			'removeurl' => ((local_user() == $item['uid']) ? 'filerm/' . $item['id'] . '?f=&cat=' . rawurlencode($savedFolderName) : ""),
+			'first' => $first,
+			'last' => false
+		];
+		$first = false;
 	}
 
 	if (count($categories)) {
@@ -208,20 +198,15 @@ function get_cats_and_terms($item)
 	}
 
 	if (local_user() == $item['uid']) {
-		$matches = [];
-		$first = true;
-		$cnt = preg_match_all('/\[(.*?)\]/', $item['file'], $matches, PREG_SET_ORDER);
-		if ($cnt) {
-			foreach ($matches as $mtch) {
-				$folders[] = [
-					'name' => XML::escape(FileTag::decode($mtch[1])),
-					'url' =>  "#",
-					'removeurl' => ((local_user() == $item['uid']) ? 'filerm/' . $item['id'] . '?f=&term=' . XML::escape(FileTag::decode($mtch[1])) : ""),
-					'first' => $first,
-					'last' => false
-				];
-				$first = false;
-			}
+		foreach (FileTag::fileToArray($item['file'] ?? '') as $savedFolderName) {
+			$folders[] = [
+				'name' => $savedFolderName,
+				'url' => "#",
+				'removeurl' => ((local_user() == $item['uid']) ? 'filerm/' . $item['id'] . '?f=&term=' . rawurlencode($savedFolderName) : ""),
+				'first' => $first,
+				'last' => false
+			];
+			$first = false;
 		}
 	}
 

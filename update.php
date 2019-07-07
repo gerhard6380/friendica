@@ -362,16 +362,15 @@ function update_1309()
 			continue;
 		}
 
-		if ($item['gravity'] == GRAVITY_PARENT) {
-			$cmd = Delivery::POST;
-		} else {
-			$cmd = Delivery::COMMENT;
-		}
-
 		$deliver_options = ['priority' => PRIORITY_MEDIUM, 'dont_fork' => true];
-		Worker::add($deliver_options, 'Delivery', $cmd, $item['id'], $entry['cid']);
+		Worker::add($deliver_options, 'Delivery', Delivery::POST, $item['id'], $entry['cid']);
 		Logger::info('Added delivery worker', ['command' => $cmd, 'item' => $item['id'], 'contact' => $entry['cid']]);
 		DBA::delete('queue', ['id' => $entry['id']]);
 	}
 	return Update::SUCCESS;
+}
+
+function update_1315()
+{
+	DBA::delete('item-delivery-data', ['postopts' => '', 'inform' => '', 'queue_count' => 0, 'queue_done' => 0]);
 }

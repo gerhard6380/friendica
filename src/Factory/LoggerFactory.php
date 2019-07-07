@@ -4,6 +4,7 @@ namespace Friendica\Factory;
 
 use Friendica\Core\Config\Configuration;
 use Friendica\Core\Logger;
+use Friendica\Database\Database;
 use Friendica\Network\HTTPException\InternalServerErrorException;
 use Friendica\Util\Introspection;
 use Friendica\Util\Logger\Monolog\DevelopHandler;
@@ -26,6 +27,7 @@ class LoggerFactory
 {
 	/**
 	 * A list of classes, which shouldn't get logged
+	 *
 	 * @var array
 	 */
 	private static $ignoreClassList = [
@@ -37,8 +39,8 @@ class LoggerFactory
 	/**
 	 * Creates a new PSR-3 compliant logger instances
 	 *
-	 * @param string        $channel The channel of the logger instance
-	 * @param Configuration $config  The config
+	 * @param string        $channel  The channel of the logger instance
+	 * @param Configuration $config   The config
 	 * @param Profiler      $profiler The profiler of the app
 	 *
 	 * @return LoggerInterface The PSR-3 compliant logger instance
@@ -46,17 +48,18 @@ class LoggerFactory
 	 * @throws \Exception
 	 * @throws InternalServerErrorException
 	 */
-	public static function create($channel, Configuration $config, Profiler $profiler)
+	public static function create($channel, Database $database, Configuration $config, Profiler $profiler)
 	{
 		if (empty($config->get('system', 'debugging', false))) {
 			$logger = new VoidLogger();
+			$database->setLogger($logger);
 			Logger::init($logger);
 			return $logger;
 		}
 
 		$introspection = new Introspection(self::$ignoreClassList);
-		$level = $config->get('system', 'loglevel');
-		$loglevel = self::mapLegacyConfigDebugLevel((string)$level);
+		$level         = $config->get('system', 'loglevel');
+		$loglevel      = self::mapLegacyConfigDebugLevel((string)$level);
 
 		switch ($config->get('system', 'logger_config', 'stream')) {
 			case 'monolog':
@@ -71,7 +74,10 @@ class LoggerFactory
 
 				$stream = $config->get('system', 'logfile');
 
-				static::addStreamHandler($logger, $stream, $loglevel);
+				// just add a stream in case it's either writable or not file
+				if (!is_file($stream) || is_writable($stream)) {
+					static::addStreamHandler($logger, $stream, $loglevel);
+				}
 				break;
 
 			case 'syslog':
@@ -81,7 +87,12 @@ class LoggerFactory
 			case 'stream':
 			default:
 				$stream = $config->get('system', 'logfile');
-				$logger = new StreamLogger($channel, $stream, $introspection, $loglevel);
+				// just add a stream in case it's either writable or not file
+				if (!is_file($stream) || is_writable($stream)) {
+					$logger = new StreamLogger($channel, $stream, $introspection, $loglevel);
+				} else {
+					$logger = new VoidLogger();
+				}
 				break;
 		}
 
@@ -92,6 +103,7 @@ class LoggerFactory
 			$logger = new ProfilerLogger($logger, $profiler);
 		}
 
+		$database->setLogger($logger);
 		Logger::init($logger);
 
 		return $logger;
@@ -105,8 +117,8 @@ class LoggerFactory
 	 *
 	 * It should never get filled during normal usage of Friendica
 	 *
-	 * @param string        $channel The channel of the logger instance
-	 * @param Configuration $config  The config
+	 * @param string        $channel  The channel of the logger instance
+	 * @param Configuration $config   The config
 	 * @param Profiler      $profiler The profiler of the app
 	 *
 	 * @return LoggerInterface The PSR-3 compliant logger instance
@@ -120,7 +132,8 @@ class LoggerFactory
 		$stream      = $config->get('system', 'dlogfile');
 		$developerIp = $config->get('system', 'dlogip');
 
-		if (!isset($developerIp) || !$debugging) {
+		if ((!isset($developerIp) || !$debugging) &&
+		    (!is_file($stream) || is_writable($stream))) {
 			$logger = new VoidLogger();
 			Logger::setDevLogger($logger);
 			return $logger;
@@ -149,7 +162,7 @@ class LoggerFactory
 				break;
 
 			case 'syslog':
-				$logger = new SyslogLogger($channel, $introspection,  LogLevel::DEBUG);
+				$logger = new SyslogLogger($channel, $introspection, LogLevel::DEBUG);
 				break;
 
 			case 'stream':
@@ -172,6 +185,7 @@ class LoggerFactory
 
 	/**
 	 * Mapping a legacy level to the PSR-3 compliant levels
+	 *
 	 * @see https://github.com/php-fig/fig-standards/blob/master/accepted/PSR-3-logger-interface.md#5-psrlogloglevel
 	 *
 	 * @param string $level the level to be mapped
@@ -208,9 +222,9 @@ class LoggerFactory
 	/**
 	 * Adding a handler to a given logger instance
 	 *
-	 * @param LoggerInterface $logger  The logger instance
-	 * @param mixed           $stream  The stream which handles the logger output
-	 * @param string          $level   The level, for which this handler at least should handle logging
+	 * @param LoggerInterface $logger The logger instance
+	 * @param mixed           $stream The stream which handles the logger output
+	 * @param string          $level  The level, for which this handler at least should handle logging
 	 *
 	 * @return void
 	 *
